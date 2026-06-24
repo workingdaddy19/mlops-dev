@@ -64,13 +64,17 @@ echo "[STEP 4] Deployment & Service 적용..."
 kubectl apply -f k8s/backend-deployment.yaml -n mlops
 kubectl apply -f k8s/backend-service.yaml -n mlops
 
+# 같은 latest 태그로 재배포 시 매니페스트 변경이 없어 롤아웃이 발생하지 않으므로,
+# 강제 재시작으로 새 이미지를 pull 하게 한다. (imagePullPolicy: Always)
+echo "    → 롤아웃 재시작(최신 이미지 강제 pull)..."
+kubectl rollout restart deployment/mlops -n mlops
+
 # ─────────────────────────────────────────────
 # STEP 5. Pod 기동 대기
 # ─────────────────────────────────────────────
 echo ""
-echo "[STEP 5] Pod 기동 대기 (최대 60초)..."
-# DEPLOY_NAME=$(kubectl get deployment -n mlops -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "ml")
-kubectl rollout status deployment/mlops -n mlops --timeout=60s
+echo "[STEP 5] Pod 기동 대기 (최대 120초)..."
+kubectl rollout status deployment/mlops -n mlops --timeout=120s
 
 # ─────────────────────────────────────────────
 # STEP 6. Ingress (ALB) 적용
