@@ -3,150 +3,288 @@
 {% block title %}대시보드 - AI 데이터 분석{% endblock %}
 
 {% block breadcrumb %}
-  <span class="current">Dashboard</span>
+  <span class="current">Home</span>
 {% endblock %}
 
 {% block content %}
 
-<!-- 서비스 현황 카드 -->
-<div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:16px; margin-bottom:24px;">
-
-  <!-- JupyterHub 서버 현황 -->
-  <div class="stat-card" id="card-jupyter">
-    <div class="stat-icon">📓</div>
-    <div class="stat-body">
-      <div class="stat-label">JupyterHub 서버</div>
-      <div class="stat-value" id="val-jupyter">—</div>
-      <div class="stat-sub"  id="sub-jupyter">확인 중...</div>
-    </div>
-    <div class="stat-badge" id="badge-jupyter">⏳</div>
+<!-- ═══ 상단: 공지 ═══════════════════════════════════════════════ -->
+<div class="card dash-notice">
+  <div class="dash-card-head">
+    <div class="card-title" style="margin:0;">📢 공지사항</div>
+    <a href="/board" class="dash-more">전체보기 ›</a>
   </div>
+  <ul id="notice-list" class="notice-list">
+    <li class="notice-empty">불러오는 중...</li>
+  </ul>
+</div>
 
-  <!-- MLFlow 상태 -->
-  <div class="stat-card" id="card-mlflow">
-    <div class="stat-icon">📈</div>
-    <div class="stat-body">
-      <div class="stat-label">MLFlow</div>
-      <div class="stat-value" id="val-mlflow">—</div>
-      <div class="stat-sub"  id="sub-mlflow">확인 중...</div>
-    </div>
-    <div class="stat-badge" id="badge-mlflow">⏳</div>
-  </div>
-
-  <!-- 포털 사용자 현황 -->
-  <div class="stat-card" id="card-users">
+<!-- ═══ 중간: 핵심 사용 현황 ═════════════════════════════════════ -->
+<div class="dash-section-title">핵심 사용 현황</div>
+<div class="stat-grid">
+  <a href="/admin/users" class="stat-card">
     <div class="stat-icon">👥</div>
     <div class="stat-body">
       <div class="stat-label">포털 사용자</div>
       <div class="stat-value" id="val-users">—</div>
-      <div class="stat-sub"  id="sub-users">확인 중...</div>
+      <div class="stat-sub">등록 계정</div>
     </div>
-    <div class="stat-badge" id="badge-users">⏳</div>
-  </div>
+  </a>
 
-  <!-- API 서버 (항상 정상) -->
-  <div class="stat-card">
-    <div class="stat-icon">⚡</div>
+  <a href="/aiml/jupyter" class="stat-card">
+    <div class="stat-icon">📓</div>
     <div class="stat-body">
-      <div class="stat-label">API 서버</div>
-      <div class="stat-value" style="color:var(--primary);">정상</div>
-      <div class="stat-sub">FastAPI :6080</div>
+      <div class="stat-label">JupyterHub 노트북 (자원 배분)</div>
+      <div class="stat-value" id="val-jupyter">—</div>
+      <div class="stat-sub" id="sub-jupyter">확인 중...</div>
     </div>
-    <div class="stat-badge" style="color:#10b981; font-size:18px;">●</div>
-  </div>
+    <div class="stat-badge" id="badge-jupyter">⏳</div>
+  </a>
 
+  <a href="/aiml/inference" class="stat-card">
+    <div class="stat-icon">🔮</div>
+    <div class="stat-body">
+      <div class="stat-label">예측 실행 · 모델</div>
+      <div class="stat-value" id="val-model">모니터링</div>
+      <div class="stat-sub" id="sub-model">MLflow 확인 중...</div>
+    </div>
+    <div class="stat-badge" id="badge-model">⏳</div>
+  </a>
+
+  <!-- 분석 자원 (admin only — JS로 표시) -->
+  <a href="/resource/dashboard" class="stat-card" id="card-resource" style="display:none;">
+    <div class="stat-icon">🧮</div>
+    <div class="stat-body">
+      <div class="stat-label">분석 자원 (활성 배분)</div>
+      <div class="stat-value" id="val-resource">—</div>
+      <div class="stat-sub" id="sub-resource">확인 중...</div>
+    </div>
+    <div class="stat-badge" id="badge-resource"></div>
+  </a>
+</div>
+
+<!-- ═══ 하단: 업무 흐름 가이드 ════════════════════════════════════ -->
+<div class="card" style="margin-top:8px;">
+  <div class="card-title">🧭 분석 업무 흐름 가이드</div>
+  <p style="font-size:12px; color:var(--text-muted); margin:-4px 0 14px;">
+    분석 과제는 아래 순서로 진행됩니다. 각 단계의 칩을 클릭하면 해당 메뉴로 이동합니다. (정식 승인·배포는 사내 <b>ITSM</b> 기준)
+  </p>
+  <div class="flow">
+    <a class="flow-step" href="/resource/projects">
+      <span class="flow-no">1</span>
+      <span class="flow-t">분석 과제 등록</span>
+      <span class="flow-d">과제명·기간·데이터·용량산정·정보보안</span>
+      <span class="flow-menu">분석자원 › 분석 과제</span>
+    </a>
+    <span class="flow-arrow">→</span>
+    <div class="flow-step flow-ext">
+      <span class="flow-no">2</span>
+      <span class="flow-t">ITSM 요청 / 승인</span>
+      <span class="flow-d">조직장 결재 (외부 표준 시스템)</span>
+      <span class="flow-menu flow-menu-ext">ITSM</span>
+    </div>
+    <span class="flow-arrow">→</span>
+    <a class="flow-step" href="/permissions">
+      <span class="flow-no">3</span>
+      <span class="flow-t">자원 생성 / 배분 요청</span>
+      <span class="flow-d">권한 신청 + 자원 대장 등록</span>
+      <span class="flow-menu">권한 신청 / 분석자원</span>
+    </a>
+    <span class="flow-arrow">→</span>
+    <a class="flow-step" href="/aiml/jupyter">
+      <span class="flow-no">4</span>
+      <span class="flow-t">과제 수행</span>
+      <span class="flow-d">노트북에서 분석·모델 개발</span>
+      <span class="flow-menu">Analysis › Jupyter</span>
+    </a>
+    <span class="flow-arrow">→</span>
+    <a class="flow-step" href="/aiml/experiments">
+      <span class="flow-no">5</span>
+      <span class="flow-t">완료 · 운영 배포 현황</span>
+      <span class="flow-d">실험·파이프라인·튜닝</span>
+      <span class="flow-menu">Models › Experiments &amp; Pipelines</span>
+    </a>
+    <span class="flow-arrow">→</span>
+    <a class="flow-step" href="/aiml/inference">
+      <span class="flow-no">6</span>
+      <span class="flow-t">예측 실행 모니터링</span>
+      <span class="flow-d">추론 API 호출·점검</span>
+      <span class="flow-menu">Models › Inference Test</span>
+    </a>
+    <span class="flow-arrow">→</span>
+    <a class="flow-step" href="/aiml/experiments">
+      <span class="flow-no">7</span>
+      <span class="flow-t">모델 품질 모니터링</span>
+      <span class="flow-d">지표·드리프트 추적</span>
+      <span class="flow-menu">Models › Experiments &amp; Pipelines</span>
+    </a>
+  </div>
+</div>
+
+<!-- ═══ 하단: 운영 관리 (admin only) ══════════════════════════════ -->
+<div class="card" id="ops-card" style="margin-top:16px; display:none;">
+  <div class="card-title">⚙️ 운영 관리</div>
+  <div class="ops-grid">
+    <a class="ops-link" href="/admin/users"><span>👥</span> 사용자 관리</a>
+    <a class="ops-link" href="/admin/permission-requests"><span>🔑</span> 권한 신청 관리</a>
+    <a class="ops-link" href="/admin/access-log"><span>🛡️</span> 접속 기록</a>
+    <a class="ops-link" href="/resource/dashboard"><span>📊</span> 자원 대시보드</a>
+    <a class="ops-link" href="/admin/resource-reclaim"><span>♻️</span> 자원 회수 현황</a>
+    <a class="ops-link" href="/admin/settings"><span>🔧</span> 시스템 설정</a>
+  </div>
 </div>
 
 {% endblock %}
 
 {% block scripts %}
 <style>
-.stat-card {
-  background: var(--bg-content);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 20px 20px 16px;
-  display: flex;
-  align-items: flex-start;
-  gap: 14px;
-  transition: box-shadow 0.15s;
-}
-.stat-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.07); }
-.stat-icon { font-size: 28px; line-height: 1; flex-shrink: 0; }
-.stat-body { flex: 1; min-width: 0; }
-.stat-label { font-size: 12px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 4px; }
-.stat-value { font-size: 22px; font-weight: 700; color: var(--text-primary); line-height: 1.2; }
-.stat-sub   { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
-.stat-badge { font-size: 12px; flex-shrink: 0; }
-.badge-ok  { color: #10b981; font-size: 18px; }
-.badge-err { color: #ef4444; font-size: 18px; }
+.dash-card-head { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
+.dash-more { font-size:12px; color:var(--primary); text-decoration:none; }
+.dash-notice { margin-bottom:18px; }
+.notice-list { list-style:none; margin:0; padding:0; }
+.notice-list li { display:flex; justify-content:space-between; gap:12px; padding:8px 2px; border-bottom:1px dashed var(--border); font-size:13px; }
+.notice-list li:last-child { border-bottom:none; }
+.notice-list a { color:var(--text-primary); text-decoration:none; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.notice-list a:hover { color:var(--primary); }
+.notice-date { color:var(--text-muted); font-size:12px; flex-shrink:0; }
+.notice-empty { color:var(--text-muted); justify-content:center !important; }
+
+.dash-section-title { font-size:13px; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:.04em; margin:6px 2px 10px; }
+.stat-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:16px; margin-bottom:18px; }
+.stat-card { background:var(--bg-content); border:1px solid var(--border); border-radius:10px; padding:18px 18px 15px; display:flex; align-items:flex-start; gap:13px; text-decoration:none; color:inherit; transition:box-shadow .15s, transform .1s; }
+.stat-card:hover { box-shadow:0 4px 16px rgba(0,0,0,.08); transform:translateY(-1px); }
+.stat-icon { font-size:27px; line-height:1; flex-shrink:0; }
+.stat-body { flex:1; min-width:0; }
+.stat-label { font-size:12px; font-weight:600; color:var(--text-muted); margin-bottom:4px; }
+.stat-value { font-size:22px; font-weight:700; color:var(--text-primary); line-height:1.2; }
+.stat-sub { font-size:11px; color:var(--text-muted); margin-top:4px; }
+.stat-badge { font-size:12px; flex-shrink:0; }
+.badge-ok { color:#10b981; font-size:18px; }
+.badge-err { color:#ef4444; font-size:18px; }
+
+/* 업무 흐름 */
+.flow { display:flex; flex-wrap:wrap; align-items:stretch; gap:6px; }
+.flow-step { flex:1 1 150px; min-width:140px; display:flex; flex-direction:column; gap:3px; padding:12px; border:1px solid var(--border); border-radius:10px; background:var(--bg-content); text-decoration:none; color:inherit; transition:border-color .12s, box-shadow .12s; position:relative; }
+.flow-step:hover { border-color:var(--primary); box-shadow:0 3px 12px rgba(13,148,136,.12); }
+.flow-ext { background:#f8fafc; border-style:dashed; }
+.flow-no { position:absolute; top:8px; right:10px; font-size:11px; font-weight:700; color:#fff; background:#0d9488; width:18px; height:18px; border-radius:50%; display:flex; align-items:center; justify-content:center; }
+.flow-ext .flow-no { background:#94a3b8; }
+.flow-t { font-size:13px; font-weight:700; padding-right:22px; }
+.flow-d { font-size:11px; color:var(--text-muted); line-height:1.4; min-height:30px; }
+.flow-menu { font-size:10px; font-weight:600; color:#0d9488; background:#f0fdfa; border-radius:5px; padding:2px 6px; align-self:flex-start; }
+.flow-menu-ext { color:#64748b; background:#e2e8f0; }
+.flow-arrow { align-self:center; color:#cbd5e1; font-size:18px; font-weight:700; }
+@media (max-width:900px){ .flow-arrow{ display:none; } }
+
+/* 운영관리 */
+.ops-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:10px; }
+.ops-link { display:flex; align-items:center; gap:9px; padding:12px 14px; border:1px solid var(--border); border-radius:8px; text-decoration:none; color:var(--text-primary); font-size:13px; font-weight:500; background:var(--bg-content); transition:background .12s, border-color .12s; }
+.ops-link:hover { background:var(--bg-secondary); border-color:var(--primary); }
+.ops-link span { font-size:16px; }
 </style>
 
 <script>
-document.addEventListener('DOMContentLoaded', loadDashboard);
-
-async function loadDashboard() {
-  await Promise.allSettled([
-    loadJupyterStats(),
-    loadMlflowStats(),
-    loadUserStats(),
+document.addEventListener('DOMContentLoaded', () => {
+  const user = Auth.getUser();
+  const isAdmin = user && user.role === 'admin';
+  if (isAdmin) {
+    document.getElementById('ops-card').style.display = '';
+    document.getElementById('card-resource').style.display = '';
+  }
+  Promise.allSettled([
+    loadNotices(),
+    loadUsers(),
+    loadJupyter(),
+    loadModel(),
+    isAdmin ? loadResource() : Promise.resolve(),
   ]);
-}
+});
 
-// ── JupyterHub 서버 현황 ─────────────────────────────────────────
-async function loadJupyterStats() {
+// ── 공지 ──────────────────────────────────────────────
+async function loadNotices() {
+  const ul = document.getElementById('notice-list');
   try {
-    const res = await apiFetch('/api/jupyter/stats');
-    if (!res) return;
-    const d = await res.json();
-
-    const ok = d.available;
-    document.getElementById('val-jupyter').textContent   = ok ? `${d.running_servers}개 실행 중` : '연결 안됨';
-    document.getElementById('val-jupyter').style.color  = ok ? 'var(--text-primary)' : '#ef4444';
-    document.getElementById('sub-jupyter').textContent   = ok ? `JupyterHub 사용자 ${d.total_users}명` : 'Admin 토큰 미설정 또는 오류';
-    document.getElementById('badge-jupyter').className   = 'stat-badge ' + (ok ? 'badge-ok' : 'badge-err');
-    document.getElementById('badge-jupyter').textContent = ok ? '●' : '●';
+    const res = await apiFetch('/api/board?board_type=notice&page=1&size=4');
+    if (!res || !res.ok) throw new Error();
+    const data = await res.json();
+    const items = data.items || [];
+    if (!items.length) { ul.innerHTML = '<li class="notice-empty">등록된 공지가 없습니다.</li>'; return; }
+    ul.innerHTML = items.map(n => `
+      <li>
+        <a href="/board" title="${escapeAttr(n.title)}">${escapeHtml(n.title)}</a>
+        <span class="notice-date">${(n.created_at||'').slice(0,10)}</span>
+      </li>`).join('');
   } catch {
-    document.getElementById('val-jupyter').textContent   = '오류';
-    document.getElementById('sub-jupyter').textContent   = '데이터 조회 실패';
-    document.getElementById('badge-jupyter').className   = 'stat-badge badge-err';
-    document.getElementById('badge-jupyter').textContent = '●';
+    ul.innerHTML = '<li class="notice-empty">공지를 불러오지 못했습니다.</li>';
   }
 }
 
-// ── MLFlow 상태 ──────────────────────────────────────────────────
-async function loadMlflowStats() {
-  try {
-    const res = await apiFetch('/api/mlflow/health');
-    if (!res) return;
-    const d = await res.json();
-    const ok = d.status === 'ok';
-    document.getElementById('val-mlflow').textContent   = ok ? '정상' : '응답 없음';
-    document.getElementById('val-mlflow').style.color  = ok ? 'var(--primary)' : '#ef4444';
-    document.getElementById('sub-mlflow').textContent   = d.url || '';
-    document.getElementById('badge-mlflow').className   = 'stat-badge ' + (ok ? 'badge-ok' : 'badge-err');
-    document.getElementById('badge-mlflow').textContent = '●';
-  } catch {
-    document.getElementById('val-mlflow').textContent = '오류';
-    document.getElementById('badge-mlflow').className   = 'stat-badge badge-err';
-    document.getElementById('badge-mlflow').textContent = '●';
-  }
-}
-
-// ── 포털 사용자 수 ───────────────────────────────────────────────
-async function loadUserStats() {
+// ── 사용자 ────────────────────────────────────────────
+async function loadUsers() {
   try {
     const res = await apiFetch('/api/admin/users/count');
-    if (!res) return;
+    if (!res || !res.ok) return;
     const d = await res.json();
-    document.getElementById('val-users').textContent   = `${d.count}명`;
-    document.getElementById('sub-users').textContent   = '포털 등록 계정';
-    document.getElementById('badge-users').className   = 'stat-badge badge-ok';
-    document.getElementById('badge-users').textContent = '●';
+    document.getElementById('val-users').textContent = `${d.count}명`;
+  } catch {}
+}
+
+// ── JupyterHub ────────────────────────────────────────
+async function loadJupyter() {
+  try {
+    const res = await apiFetch('/api/jupyter/stats');
+    if (!res || !res.ok) throw new Error();
+    const d = await res.json();
+    const ok = d.available;
+    document.getElementById('val-jupyter').textContent = ok ? `${d.running_servers}개 실행 중` : '연결 안됨';
+    document.getElementById('val-jupyter').style.color = ok ? '' : '#ef4444';
+    document.getElementById('sub-jupyter').textContent = ok ? `사용자 ${d.total_users}명` : 'Admin 토큰 미설정/오류';
+    setBadge('badge-jupyter', ok);
   } catch {
-    document.getElementById('val-users').textContent   = '—';
-    document.getElementById('sub-users').textContent   = '조회 실패';
+    document.getElementById('val-jupyter').textContent = '오류';
+    document.getElementById('sub-jupyter').textContent = '조회 실패';
+    setBadge('badge-jupyter', false);
   }
 }
+
+// ── 예측·모델 (MLflow health) ─────────────────────────
+async function loadModel() {
+  try {
+    const res = await apiFetch('/api/mlflow/health');
+    if (!res || !res.ok) throw new Error();
+    const d = await res.json();
+    const ok = d.status === 'ok';
+    document.getElementById('sub-model').textContent = ok ? 'MLflow 정상 · 추론 테스트 →' : 'MLflow 응답 없음';
+    setBadge('badge-model', ok);
+  } catch {
+    document.getElementById('sub-model').textContent = '상태 조회 실패';
+    setBadge('badge-model', false);
+  }
+}
+
+// ── 분석 자원 (admin) ─────────────────────────────────
+async function loadResource() {
+  try {
+    const res = await apiFetch('/api/resource/dashboard');
+    if (!res || !res.ok) return;
+    const d = await res.json();
+    document.getElementById('val-resource').textContent = `${d.active_count}건`;
+    const t = d.capacity_totals || {};
+    let sub = `${t.vcpu||0}vCPU / ${t.mem_gb||0}GB`;
+    if (d.overdue_count) sub += ` · 회수대상 ${d.overdue_count}`;
+    else if (d.expiring_count) sub += ` · 만료임박 ${d.expiring_count}`;
+    document.getElementById('sub-resource').textContent = sub;
+    setBadge('badge-resource', !(d.overdue_count));
+  } catch {}
+}
+
+function setBadge(id, ok) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.className = 'stat-badge ' + (ok ? 'badge-ok' : 'badge-err');
+  el.textContent = '●';
+}
+function escapeHtml(s){ if(s==null)return''; return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function escapeAttr(s){ if(s==null)return''; return String(s).replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
 </script>
 {% endblock %}

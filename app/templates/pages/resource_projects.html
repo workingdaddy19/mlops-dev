@@ -1,0 +1,240 @@
+{% extends "base.html" %}
+
+{% block title %}분석 과제 - AI 데이터 분석{% endblock %}
+
+{% block breadcrumb %}
+  <span>분석자원</span>
+  <span class="sep">›</span>
+  <span class="current">분석 과제</span>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+    <div class="card-title" style="margin-bottom:0;">🗂️ 분석 과제 관리</div>
+    <div style="display:flex; gap:8px; align-items:center;">
+      <select id="status-filter" class="form-select" style="padding:4px 10px; font-size:13px;" onchange="loadProjects()">
+        <option value="">전체</option>
+        <option value="planning">계획</option>
+        <option value="active">진행</option>
+        <option value="completed">완료</option>
+      </select>
+      <button class="btn btn-primary" onclick="openCreateModal()">+ 과제 등록</button>
+    </div>
+  </div>
+
+  <div id="proj-status" style="font-size:13px; color:var(--text-muted); margin-bottom:12px;"></div>
+
+  <div style="overflow-x:auto;">
+    <table class="data-table" id="proj-table">
+      <thead>
+        <tr>
+          <th style="width:150px;">코드</th>
+          <th>과제명</th>
+          <th style="width:100px;">담당자</th>
+          <th style="width:170px;">기간</th>
+          <th style="width:60px; text-align:center;">인원</th>
+          <th style="width:90px; text-align:center;">보안협의</th>
+          <th style="width:80px; text-align:center;">상태</th>
+          <th style="width:120px;">작업</th>
+        </tr>
+      </thead>
+      <tbody id="proj-tbody">
+        <tr><td colspan="8" style="text-align:center; color:var(--text-muted); padding:24px;">로딩 중...</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- 과제 등록 모달 -->
+<div class="modal-overlay" id="createModal">
+  <div class="modal-box" style="width:560px; max-width:96vw; max-height:90vh; overflow-y:auto;">
+    <div class="modal-title">분석 과제 등록 (과제 정의서)</div>
+    <div class="form-group">
+      <label class="form-label">과제명 *</label>
+      <input id="f-name" class="form-input" placeholder="예: 고객 이탈 예측 모델 v2">
+    </div>
+    <div style="display:flex; gap:10px;">
+      <div class="form-group" style="flex:1;">
+        <label class="form-label">담당자 *</label>
+        <input id="f-owner" class="form-input" placeholder="예: 김분석">
+      </div>
+      <div class="form-group" style="width:130px;">
+        <label class="form-label">코드</label>
+        <input id="f-code" class="form-input" placeholder="비우면 자동생성">
+      </div>
+      <div class="form-group" style="width:90px;">
+        <label class="form-label">인원수</label>
+        <input id="f-member-count" class="form-input" type="number" min="1" value="1">
+      </div>
+    </div>
+    <div style="display:flex; gap:10px;">
+      <div class="form-group" style="flex:1;">
+        <label class="form-label">기간 시작</label>
+        <input id="f-start" class="form-input" type="date">
+      </div>
+      <div class="form-group" style="flex:1;">
+        <label class="form-label">기간 종료</label>
+        <input id="f-end" class="form-input" type="date">
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">분석가 명단</label>
+      <input id="f-members" class="form-input" placeholder="예: 김분석, 이데이터, 박모델">
+    </div>
+    <div class="form-group">
+      <label class="form-label">분석 데이터 종류</label>
+      <input id="f-data-types" class="form-input" placeholder="예: 거래로그, 고객마스터, 상품정보">
+    </div>
+    <div class="form-group">
+      <label class="form-label">데이터셋 / 출처</label>
+      <input id="f-datasets" class="form-input" placeholder="예: athena.tx_log (2.1억행), s3://.../cust">
+    </div>
+    <div style="display:flex; gap:10px;">
+      <div class="form-group" style="flex:1;">
+        <label class="form-label">정보보안 협의</label>
+        <select id="f-sec-status" class="form-select">
+          <option value="none">미협의</option>
+          <option value="requested">협의요청</option>
+          <option value="done">협의완료</option>
+        </select>
+      </div>
+      <div class="form-group" style="flex:1;">
+        <label class="form-label">협의일</label>
+        <input id="f-sec-date" class="form-input" type="date">
+      </div>
+      <div class="form-group" style="flex:1;">
+        <label class="form-label">ITSM 티켓</label>
+        <input id="f-itsm" class="form-input" placeholder="예: ITSM-12345">
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">목적 / 설명</label>
+      <textarea id="f-purpose" class="form-input" rows="2" placeholder="과제 목적"></textarea>
+    </div>
+    <p style="font-size:12px; color:var(--text-muted); margin:4px 0 0;">※ 용량 산정·자원 배분은 등록 후 <strong>과제 상세</strong>에서 작성합니다.</p>
+    <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:18px;">
+      <button class="btn btn-secondary" onclick="closeCreateModal()">취소</button>
+      <button class="btn btn-primary" onclick="submitCreate()">등록</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const PROJ_STATUS = {
+  planning:  { text:'계획', bg:'#fef3c7', fg:'#92400e' },
+  active:    { text:'진행', bg:'#d1fae5', fg:'#065f46' },
+  completed: { text:'완료', bg:'#e2e8f0', fg:'#475569' },
+};
+const SEC_STATUS = {
+  none:      { text:'미협의', bg:'#e2e8f0', fg:'#475569' },
+  requested: { text:'요청',   bg:'#fef3c7', fg:'#92400e' },
+  done:      { text:'완료',   bg:'#d1fae5', fg:'#065f46' },
+};
+
+document.addEventListener('DOMContentLoaded', loadProjects);
+
+async function loadProjects() {
+  const tbody = document.getElementById('proj-tbody');
+  const statusEl = document.getElementById('proj-status');
+  const filter = document.getElementById('status-filter').value;
+  tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:24px;">로딩 중...</td></tr>';
+
+  const res = await apiFetch('/api/resource/projects' + (filter ? `?status=${filter}` : ''));
+  if (!res) return;
+  if (res.status === 403) {
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#ef4444;padding:24px;">⛔ 관리자 권한이 필요합니다.</td></tr>';
+    return;
+  }
+  if (!res.ok) { statusEl.textContent = '조회 실패'; return; }
+
+  const items = await res.json();
+  statusEl.textContent = `총 ${items.length}건`;
+  if (!items.length) {
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:24px;">등록된 과제가 없습니다.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = items.map(p => {
+    const st = PROJ_STATUS[p.status] || PROJ_STATUS.planning;
+    const sec = SEC_STATUS[p.security_review_status] || SEC_STATUS.none;
+    const period = (p.period_start || '?') + ' ~ ' + (p.period_end || '?');
+    return `
+      <tr>
+        <td><a href="/resource/projects/${p.id}" style="font-family:monospace; font-size:12px; color:var(--primary); font-weight:600;">${escapeHtml(p.code)}</a></td>
+        <td><a href="/resource/projects/${p.id}" style="font-weight:600;">${escapeHtml(p.name)}</a></td>
+        <td>${escapeHtml(p.owner)}</td>
+        <td style="font-size:12px; color:var(--text-muted);">${escapeHtml(period)}</td>
+        <td style="text-align:center;">${p.member_count}</td>
+        <td style="text-align:center;"><span style="font-size:11px;padding:2px 7px;border-radius:99px;background:${sec.bg};color:${sec.fg};font-weight:600;">${sec.text}</span></td>
+        <td style="text-align:center;"><span style="font-size:11px;padding:2px 8px;border-radius:99px;background:${st.bg};color:${st.fg};font-weight:600;">${st.text}</span></td>
+        <td>
+          <a class="btn btn-secondary" style="padding:4px 10px;font-size:12px;" href="/resource/projects/${p.id}">상세</a>
+          <button class="btn btn-danger" style="padding:4px 10px;font-size:12px;margin-left:4px;" onclick="deleteProject(${p.id},'${escapeAttr(p.code)}')">삭제</button>
+        </td>
+      </tr>`;
+  }).join('');
+}
+
+function openCreateModal() {
+  ['f-name','f-owner','f-code','f-start','f-end','f-members','f-data-types','f-datasets','f-sec-date','f-itsm','f-purpose'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('f-member-count').value = '1';
+  document.getElementById('f-sec-status').value = 'none';
+  document.getElementById('createModal').classList.add('open');
+}
+function closeCreateModal() { document.getElementById('createModal').classList.remove('open'); }
+
+async function submitCreate() {
+  const name = document.getElementById('f-name').value.trim();
+  const owner = document.getElementById('f-owner').value.trim();
+  if (!name || !owner) { alert('과제명과 담당자는 필수입니다.'); return; }
+
+  const body = {
+    name, owner,
+    code: document.getElementById('f-code').value.trim() || null,
+    period_start: document.getElementById('f-start').value || null,
+    period_end: document.getElementById('f-end').value || null,
+    member_count: parseInt(document.getElementById('f-member-count').value || '1', 10),
+    members: document.getElementById('f-members').value.trim() || null,
+    data_types: document.getElementById('f-data-types').value.trim() || null,
+    datasets: document.getElementById('f-datasets').value.trim() || null,
+    security_review_status: document.getElementById('f-sec-status').value,
+    security_review_date: document.getElementById('f-sec-date').value || null,
+    itsm_ticket: document.getElementById('f-itsm').value.trim() || null,
+    purpose: document.getElementById('f-purpose').value.trim() || null,
+  };
+  const res = await apiFetch('/api/resource/projects', { method:'POST', body: JSON.stringify(body) });
+  if (!res) return;
+  if (res.ok) {
+    const p = await res.json();
+    closeCreateModal();
+    showToast('과제가 등록되었습니다.', 'success');
+    window.location.href = `/resource/projects/${p.id}`;
+  } else {
+    const err = await res.json().catch(() => ({}));
+    showToast(err.detail || '등록 실패', 'error');
+  }
+}
+
+async function deleteProject(id, code) {
+  if (!confirm(`'${code}' 과제를 삭제하시겠습니까? 산정서·자원대장도 함께 삭제됩니다.`)) return;
+  const res = await apiFetch(`/api/resource/projects/${id}`, { method:'DELETE' });
+  if (!res) return;
+  if (res.ok || res.status === 204) { loadProjects(); showToast('삭제되었습니다.', 'success'); }
+  else { const e = await res.json().catch(()=>({})); showToast(e.detail || '삭제 실패', 'error'); }
+}
+
+function showToast(msg, type='info') {
+  const bg = type==='error'?'#ef4444':type==='success'?'#10b981':'#1e293b';
+  const t = document.createElement('div'); t.textContent = msg;
+  t.style.cssText = `position:fixed;bottom:24px;right:24px;background:${bg};color:#fff;padding:10px 18px;border-radius:8px;font-size:13px;z-index:9999;opacity:0;transition:opacity .2s;`;
+  document.body.appendChild(t); requestAnimationFrame(()=>t.style.opacity='1');
+  setTimeout(()=>{t.style.opacity='0';setTimeout(()=>t.remove(),200);},3000);
+}
+function escapeHtml(s){ if(s==null)return''; return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function escapeAttr(s){ if(s==null)return''; return String(s).replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+document.addEventListener('click', e => { if (e.target.classList.contains('modal-overlay')) e.target.classList.remove('open'); });
+</script>
+{% endblock %}

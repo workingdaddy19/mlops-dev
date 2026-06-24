@@ -1,0 +1,407 @@
+{% extends "base.html" %}
+
+{% block title %}과제 상세 - AI 데이터 분석{% endblock %}
+
+{% block breadcrumb %}
+  <span>분석자원</span>
+  <span class="sep">›</span>
+  <a href="/resource/projects" style="color:var(--primary);">분석 과제</a>
+  <span class="sep">›</span>
+  <span class="current" id="bc-code">상세</span>
+{% endblock %}
+
+{% block content %}
+<!-- 과제 정보 -->
+<div class="card" style="margin-bottom:16px;">
+  <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:12px;">
+    <div class="card-title" id="proj-title" style="margin-bottom:0;">과제 정보</div>
+    <div style="display:flex; gap:8px; align-items:center;">
+      <label style="font-size:12px; color:var(--text-muted);">상태</label>
+      <select id="proj-status-sel" class="form-select" style="padding:4px 10px; font-size:13px;" onchange="changeProjectStatus()">
+        <option value="planning">계획</option>
+        <option value="active">진행</option>
+        <option value="completed">완료</option>
+      </select>
+    </div>
+  </div>
+  <div id="proj-info" style="font-size:13px; line-height:1.9;">로딩 중...</div>
+</div>
+
+<!-- 용량 산정서 -->
+<div class="card" style="margin-bottom:16px;">
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+    <div class="card-title" style="margin-bottom:0;">🧮 용량 산정서 (Peak 기반)</div>
+    <button class="btn btn-primary" style="padding:5px 12px; font-size:13px;" onclick="openEstimateModal()">+ 산정서 작성</button>
+  </div>
+  <div id="estimates"></div>
+</div>
+
+<!-- 자원 대장 -->
+<div class="card">
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+    <div class="card-title" style="margin-bottom:0;">📒 자원 대장 (배분 / 라이프사이클)</div>
+    <button class="btn btn-primary" style="padding:5px 12px; font-size:13px;" onclick="openLedgerModal()">+ 자원 배분 등록</button>
+  </div>
+  <div style="overflow-x:auto;">
+    <table class="data-table" id="ledger-table">
+      <thead>
+        <tr>
+          <th style="width:80px;">상태</th>
+          <th>네임스페이스 / 노드</th>
+          <th style="width:140px;">용량</th>
+          <th style="width:110px;">ITSM</th>
+          <th style="width:160px;">만료</th>
+          <th style="width:240px;">전이 / 작업</th>
+        </tr>
+      </thead>
+      <tbody id="ledger-tbody">
+        <tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:20px;">로딩 중...</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- 산정서 작성 모달 -->
+<div class="modal-overlay" id="estimateModal">
+  <div class="modal-box" style="width:720px; max-width:97vw; max-height:92vh; overflow-y:auto;">
+    <div class="modal-title">용량 산정서 작성</div>
+    <div class="form-group">
+      <label class="form-label">데이터 요약</label>
+      <input id="e-dataset" class="form-input" placeholder="예: 거래로그 2.1억행 × 120B/row ≈ 25GB">
+    </div>
+    <div style="margin:8px 0 4px; font-weight:600; font-size:13px;">단계별 워크시트 (메모리 증감 누적 → Peak)</div>
+    <div style="overflow-x:auto;">
+      <table class="data-table" style="font-size:12px;">
+        <thead>
+          <tr>
+            <th>작업</th><th style="width:110px;">데이터 규모</th><th>산출 근거</th>
+            <th style="width:70px;">vCPU</th><th style="width:90px;">메모리Δ(GB)</th><th style="width:40px;"></th>
+          </tr>
+        </thead>
+        <tbody id="step-rows"></tbody>
+      </table>
+    </div>
+    <button class="btn btn-secondary" style="padding:4px 10px; font-size:12px; margin-top:6px;" onclick="addStepRow()">+ 단계 추가</button>
+    <div id="peak-preview" style="margin-top:10px; font-size:13px; background:#f0fdfa; border:1px solid #99f6e4; border-radius:6px; padding:8px 12px;">
+      Peak 메모리: <strong id="pk-mem">-</strong> GB · Peak vCPU: <strong id="pk-vcpu">-</strong>
+    </div>
+    <div style="display:flex; gap:10px; margin-top:10px;">
+      <div class="form-group" style="flex:1;">
+        <label class="form-label">권장 노드</label>
+        <input id="e-node" class="form-input" placeholder="예: r6i.2xlarge × 1">
+      </div>
+      <div class="form-group" style="width:160px;">
+        <label class="form-label">작성자</label>
+        <input id="e-by" class="form-input" placeholder="예: 김분석">
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">산정 근거 / 메모</label>
+      <textarea id="e-note" class="form-input" rows="2" placeholder="예: groupby 단계에서 임시객체 burst로 Peak 발생"></textarea>
+    </div>
+    <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:14px;">
+      <button class="btn btn-secondary" onclick="closeEstimateModal()">취소</button>
+      <button class="btn btn-primary" onclick="submitEstimate()">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- 자원 배분 모달 -->
+<div class="modal-overlay" id="ledgerModal">
+  <div class="modal-box" style="width:560px; max-width:96vw; max-height:92vh; overflow-y:auto;">
+    <div class="modal-title" id="ledger-modal-title">자원 배분 등록</div>
+    <input type="hidden" id="l-id">
+    <div style="display:flex; gap:10px;">
+      <div class="form-group" style="flex:1;"><label class="form-label">네임스페이스</label><input id="l-ns" class="form-input" placeholder="예: prj-churn"></div>
+      <div class="form-group" style="flex:1;"><label class="form-label">노드그룹</label><input id="l-ng" class="form-input" placeholder="예: ng-analysis-r6i"></div>
+    </div>
+    <div class="form-group"><label class="form-label">Jupyter 서버 유형</label><input id="l-jst" class="form-input" placeholder="예: r6i.2xlarge (8vCPU/64GB)"></div>
+    <div style="display:flex; gap:10px;">
+      <div class="form-group" style="flex:1;"><label class="form-label">vCPU</label><input id="l-vcpu" class="form-input" type="number" step="0.5" placeholder="8"></div>
+      <div class="form-group" style="flex:1;"><label class="form-label">메모리(GB)</label><input id="l-mem" class="form-input" type="number" step="1" placeholder="64"></div>
+      <div class="form-group" style="flex:1;"><label class="form-label">GPU</label><input id="l-gpu" class="form-input" type="number" step="1" placeholder="0"></div>
+    </div>
+    <div style="display:flex; gap:10px;">
+      <div class="form-group" style="flex:1;"><label class="form-label">ITSM 티켓</label><input id="l-itsm" class="form-input" placeholder="ITSM-12345"></div>
+      <div class="form-group" style="flex:1;"><label class="form-label">배분일</label><input id="l-alloc" class="form-input" type="date"></div>
+      <div class="form-group" style="flex:1;"><label class="form-label">만료일</label><input id="l-expire" class="form-input" type="date"></div>
+    </div>
+    <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:14px;">
+      <button class="btn btn-secondary" onclick="closeLedgerModal()">취소</button>
+      <button class="btn btn-primary" onclick="submitLedger()">저장</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const PROJECT_ID = {{ project_id }};
+
+const LEDGER_NEXT = {
+  draft:['submitted'], submitted:['approved','draft'], approved:['active','submitted'],
+  active:['reclaim_pending'], reclaim_pending:['reclaimed','active'], reclaimed:[],
+};
+const LSTATUS = {
+  draft:{t:'작성',bg:'#e2e8f0',fg:'#475569'}, submitted:{t:'제출',bg:'#dbeafe',fg:'#1d4ed8'},
+  approved:{t:'승인',bg:'#ede9fe',fg:'#5b21b6'}, active:{t:'활성',bg:'#d1fae5',fg:'#065f46'},
+  reclaim_pending:{t:'회수대기',bg:'#fed7aa',fg:'#9a3412'}, reclaimed:{t:'회수완료',bg:'#e2e8f0',fg:'#475569'},
+};
+const TRANS_LABEL = { submitted:'제출', approved:'승인', active:'활성화', draft:'반려', reclaim_pending:'회수대기 →', reclaimed:'회수완료' };
+const RECLAIM_REASON = { expired:'정기(만료)', idle:'유휴(Idle)', event:'이벤트(중단/변경)' };
+
+document.addEventListener('DOMContentLoaded', loadDetail);
+
+async function loadDetail() {
+  const res = await apiFetch(`/api/resource/projects/${PROJECT_ID}`);
+  if (!res) return;
+  if (res.status === 403) { document.getElementById('proj-info').innerHTML = '⛔ 관리자 권한이 필요합니다.'; return; }
+  if (res.status === 404) { document.getElementById('proj-info').innerHTML = '과제를 찾을 수 없습니다.'; return; }
+  const p = await res.json();
+
+  document.getElementById('bc-code').textContent = p.code;
+  document.getElementById('proj-title').textContent = `${p.code} · ${p.name}`;
+  document.getElementById('proj-status-sel').value = p.status;
+
+  const sec = {none:'미협의', requested:'협의요청', done:'협의완료'}[p.security_review_status] || p.security_review_status;
+  document.getElementById('proj-info').innerHTML = `
+    <div><b>담당자</b> ${escapeHtml(p.owner)} · <b>인원</b> ${p.member_count}명 ${p.members?'('+escapeHtml(p.members)+')':''}</div>
+    <div><b>기간</b> ${p.period_start||'?'} ~ ${p.period_end||'?'}</div>
+    <div><b>데이터 종류</b> ${escapeHtml(p.data_types||'-')}</div>
+    <div><b>데이터셋</b> ${escapeHtml(p.datasets||'-')}</div>
+    <div><b>정보보안 협의</b> ${sec} ${p.security_review_date?'('+p.security_review_date+')':''} · <b>ITSM</b> ${escapeHtml(p.itsm_ticket||'-')}</div>
+    <div><b>목적</b> ${escapeHtml(p.purpose||'-')}</div>`;
+
+  renderEstimates(p.estimates || []);
+  renderLedgers(p.ledgers || []);
+}
+
+// ── 산정서 렌더 ──────────────────────────────────────────────
+function renderEstimates(list) {
+  const wrap = document.getElementById('estimates');
+  if (!list.length) { wrap.innerHTML = '<div style="color:var(--text-muted);font-size:13px;padding:8px 0;">작성된 산정서가 없습니다.</div>'; return; }
+  wrap.innerHTML = list.map(e => {
+    const stepsRows = (e.steps||[]).map(s => `
+      <tr style="${s.is_peak?'background:#fef9c3;':''}">
+        <td>${s.step_no}</td><td>${escapeHtml(s.operation)}</td><td>${escapeHtml(s.data_scale||'')}</td>
+        <td style="font-size:11px;color:var(--text-muted);">${escapeHtml(s.rationale||'')}</td>
+        <td style="text-align:right;">${fmtNum(s.vcpu)}</td>
+        <td style="text-align:right;">${fmtNum(s.mem_delta_gb)}</td>
+        <td style="text-align:right;font-weight:600;">${fmtNum(s.cumulative_peak_gb)}${s.is_peak?' 🔺':''}</td>
+      </tr>`).join('');
+    const stepsTable = (e.steps||[]).length ? `
+      <table class="data-table" style="font-size:12px;margin-top:8px;">
+        <thead><tr><th>#</th><th>작업</th><th>규모</th><th>근거</th><th style="text-align:right;">vCPU</th><th style="text-align:right;">메모리Δ</th><th style="text-align:right;">누적Peak</th></tr></thead>
+        <tbody>${stepsRows}</tbody>
+      </table>` : '';
+    return `
+      <div style="border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:10px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <div style="font-size:14px;">
+            <b style="color:#0d9488;">Peak ${fmtNum(e.derived_peak_memory_gb)}GB</b> · <b>${fmtNum(e.derived_peak_vcpu)} vCPU</b>
+            ${e.recommended_node?` · 권장: ${escapeHtml(e.recommended_node)}`:''}
+          </div>
+          <div style="font-size:11px;color:var(--text-muted);">
+            ${e.estimated_by?escapeHtml(e.estimated_by)+' · ':''}${fmtTime(e.created_at)}
+            <button class="btn btn-danger" style="padding:2px 8px;font-size:11px;margin-left:8px;" onclick="deleteEstimate(${e.id})">삭제</button>
+          </div>
+        </div>
+        ${e.dataset_summary?`<div style="font-size:12px;color:var(--text-muted);margin-top:4px;">${escapeHtml(e.dataset_summary)}</div>`:''}
+        ${e.basis_note?`<div style="font-size:12px;margin-top:4px;">📝 ${escapeHtml(e.basis_note)}</div>`:''}
+        ${stepsTable}
+      </div>`;
+  }).join('');
+}
+
+// ── 자원대장 렌더 ─────────────────────────────────────────────
+function renderLedgers(list) {
+  const tbody = document.getElementById('ledger-tbody');
+  if (!list.length) { tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:20px;">배분된 자원이 없습니다.</td></tr>'; return; }
+  tbody.innerHTML = list.map(l => {
+    const st = LSTATUS[l.status] || {t:l.status,bg:'#e2e8f0',fg:'#475569'};
+    const cap = `${fmtNum(l.alloc_vcpu)}vCPU / ${fmtNum(l.alloc_mem_gb)}GB${l.alloc_gpu?` / GPU${l.alloc_gpu}`:''}`;
+    const transitions = (LEDGER_NEXT[l.status]||[]).map(to => {
+      const danger = (to==='reclaimed'||to==='reclaim_pending');
+      return `<button class="btn ${danger?'btn-danger':'btn-secondary'}" style="padding:3px 9px;font-size:11px;margin:1px;" onclick="transition(${l.id},'${to}')">${TRANS_LABEL[to]||to}</button>`;
+    }).join('');
+    return `
+      <tr>
+        <td><span style="font-size:11px;padding:2px 8px;border-radius:99px;background:${st.bg};color:${st.fg};font-weight:600;white-space:nowrap;">${st.t}</span></td>
+        <td style="font-size:12px;">${escapeHtml(l.namespace||'-')}<br><span style="color:var(--text-muted);">${escapeHtml(l.node_group||'')} ${escapeHtml(l.jupyter_server_type||'')}</span></td>
+        <td style="font-size:12px;">${cap}</td>
+        <td style="font-size:12px;">${escapeHtml(l.itsm_ticket||'-')}</td>
+        <td style="font-size:12px;">${expiryBadge(l)}</td>
+        <td>
+          ${transitions}
+          <button class="btn btn-secondary" style="padding:3px 9px;font-size:11px;margin:1px;" onclick="editLedger(${l.id})">수정</button>
+          <button class="btn btn-danger" style="padding:3px 9px;font-size:11px;margin:1px;" onclick="deleteLedger(${l.id})">삭제</button>
+        </td>
+      </tr>`;
+  }).join('');
+}
+
+function expiryBadge(l) {
+  if (!l.expires_at) return '<span style="color:var(--text-muted);">-</span>';
+  const d = l.days_to_expiry;
+  let color = '#475569', label = `${l.expires_at}`;
+  if (l.expiry_state === 'overdue') { color='#dc2626'; label = `${l.expires_at} (만료 ${Math.abs(d)}일 경과)`; }
+  else if (l.expiry_state === 'soon') { color='#d97706'; label = `${l.expires_at} (D-${d})`; }
+  else if (d!=null) { label = `${l.expires_at} (D-${d})`; }
+  return `<span style="color:${color};font-weight:${l.expiry_state==='ok'?400:600};">${label}</span>`;
+}
+
+// ── 과제 상태 변경 ─────────────────────────────────────────────
+async function changeProjectStatus() {
+  const status = document.getElementById('proj-status-sel').value;
+  const res = await apiFetch(`/api/resource/projects/${PROJECT_ID}`, { method:'PUT', body: JSON.stringify({ status }) });
+  if (res && res.ok) showToast('상태가 변경되었습니다.', 'success');
+  else showToast('상태 변경 실패', 'error');
+}
+
+// ── 산정서 모달 ────────────────────────────────────────────────
+function openEstimateModal() {
+  ['e-dataset','e-node','e-by','e-note'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('step-rows').innerHTML='';
+  addStepRow(); addStepRow();
+  recalcPeak();
+  document.getElementById('estimateModal').classList.add('open');
+}
+function closeEstimateModal(){ document.getElementById('estimateModal').classList.remove('open'); }
+
+function addStepRow() {
+  const tr = document.createElement('tr');
+  tr.innerHTML = `
+    <td><input class="form-input s-op" style="padding:3px 6px;font-size:12px;" placeholder="예: groupby"></td>
+    <td><input class="form-input s-scale" style="padding:3px 6px;font-size:12px;" placeholder="2.1억행"></td>
+    <td><input class="form-input s-rat" style="padding:3px 6px;font-size:12px;" placeholder="임시객체 burst"></td>
+    <td><input class="form-input s-vcpu" type="number" step="0.5" style="padding:3px 6px;font-size:12px;" oninput="recalcPeak()"></td>
+    <td><input class="form-input s-mem" type="number" step="0.5" style="padding:3px 6px;font-size:12px;" oninput="recalcPeak()"></td>
+    <td><button class="btn btn-danger" style="padding:2px 7px;font-size:11px;" onclick="this.closest('tr').remove();recalcPeak()">×</button></td>`;
+  document.getElementById('step-rows').appendChild(tr);
+}
+
+function collectSteps() {
+  return [...document.querySelectorAll('#step-rows tr')].map(tr => ({
+    operation: tr.querySelector('.s-op').value.trim(),
+    data_scale: tr.querySelector('.s-scale').value.trim() || null,
+    rationale: tr.querySelector('.s-rat').value.trim() || null,
+    vcpu: parseFloat(tr.querySelector('.s-vcpu').value) || null,
+    mem_delta_gb: parseFloat(tr.querySelector('.s-mem').value) || null,
+  })).filter(s => s.operation);
+}
+
+function recalcPeak() {
+  const steps = collectSteps();
+  let cum=0, peak=0; const vcpus=[];
+  steps.forEach(s => { cum += (s.mem_delta_gb||0); peak = Math.max(peak, cum); if(s.vcpu!=null) vcpus.push(s.vcpu); });
+  document.getElementById('pk-mem').textContent = steps.length ? peak.toFixed(1) : '-';
+  document.getElementById('pk-vcpu').textContent = vcpus.length ? Math.max(...vcpus) : '-';
+}
+
+async function submitEstimate() {
+  const steps = collectSteps();
+  const body = {
+    dataset_summary: document.getElementById('e-dataset').value.trim() || null,
+    recommended_node: document.getElementById('e-node').value.trim() || null,
+    basis_note: document.getElementById('e-note').value.trim() || null,
+    estimated_by: document.getElementById('e-by').value.trim() || null,
+    steps,
+  };
+  const res = await apiFetch(`/api/resource/projects/${PROJECT_ID}/estimates`, { method:'POST', body: JSON.stringify(body) });
+  if (!res) return;
+  if (res.ok) { closeEstimateModal(); showToast('산정서가 저장되었습니다.', 'success'); loadDetail(); }
+  else { const e = await res.json().catch(()=>({})); showToast(e.detail || '저장 실패', 'error'); }
+}
+
+async function deleteEstimate(id) {
+  if (!confirm('이 산정서를 삭제하시겠습니까?')) return;
+  const res = await apiFetch(`/api/resource/estimates/${id}`, { method:'DELETE' });
+  if (res && (res.ok || res.status===204)) { showToast('삭제되었습니다.', 'success'); loadDetail(); }
+}
+
+// ── 자원대장 모달 ─────────────────────────────────────────────
+function openLedgerModal() {
+  document.getElementById('ledger-modal-title').textContent = '자원 배분 등록';
+  ['l-id','l-ns','l-ng','l-jst','l-vcpu','l-mem','l-gpu','l-itsm','l-alloc','l-expire'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('ledgerModal').classList.add('open');
+}
+function closeLedgerModal(){ document.getElementById('ledgerModal').classList.remove('open'); }
+
+let _ledgerCache = [];
+async function editLedger(id) {
+  const res = await apiFetch(`/api/resource/projects/${PROJECT_ID}`);
+  const p = res && res.ok ? await res.json() : null;
+  const l = p && (p.ledgers||[]).find(x=>x.id===id);
+  if (!l) return;
+  document.getElementById('ledger-modal-title').textContent = '자원 배분 수정';
+  document.getElementById('l-id').value = l.id;
+  document.getElementById('l-ns').value = l.namespace||'';
+  document.getElementById('l-ng').value = l.node_group||'';
+  document.getElementById('l-jst').value = l.jupyter_server_type||'';
+  document.getElementById('l-vcpu').value = l.alloc_vcpu??'';
+  document.getElementById('l-mem').value = l.alloc_mem_gb??'';
+  document.getElementById('l-gpu').value = l.alloc_gpu??'';
+  document.getElementById('l-itsm').value = l.itsm_ticket||'';
+  document.getElementById('l-alloc').value = l.allocated_at||'';
+  document.getElementById('l-expire').value = l.expires_at||'';
+  document.getElementById('ledgerModal').classList.add('open');
+}
+
+async function submitLedger() {
+  const id = document.getElementById('l-id').value;
+  const body = {
+    namespace: document.getElementById('l-ns').value.trim() || null,
+    node_group: document.getElementById('l-ng').value.trim() || null,
+    jupyter_server_type: document.getElementById('l-jst').value.trim() || null,
+    alloc_vcpu: parseFloat(document.getElementById('l-vcpu').value) || null,
+    alloc_mem_gb: parseFloat(document.getElementById('l-mem').value) || null,
+    alloc_gpu: parseInt(document.getElementById('l-gpu').value,10) || null,
+    itsm_ticket: document.getElementById('l-itsm').value.trim() || null,
+    allocated_at: document.getElementById('l-alloc').value || null,
+    expires_at: document.getElementById('l-expire').value || null,
+  };
+  const url = id ? `/api/resource/ledgers/${id}` : `/api/resource/projects/${PROJECT_ID}/ledgers`;
+  const res = await apiFetch(url, { method: id ? 'PUT':'POST', body: JSON.stringify(body) });
+  if (!res) return;
+  if (res.ok) { closeLedgerModal(); showToast('저장되었습니다.', 'success'); loadDetail(); }
+  else { const e = await res.json().catch(()=>({})); showToast(e.detail || '저장 실패', 'error'); }
+}
+
+async function transition(id, to) {
+  let reclaim_reason = null;
+  if (to === 'reclaimed') {
+    const opts = Object.entries(RECLAIM_REASON).map(([k,v],i)=>`${i+1}) ${v}`).join('  ');
+    const keys = Object.keys(RECLAIM_REASON);
+    const pick = prompt(`회수 사유를 선택하세요:\n${opts}\n\n번호 입력 (1-${keys.length})`, '1');
+    if (pick===null) return;
+    reclaim_reason = keys[parseInt(pick,10)-1];
+    if (!reclaim_reason) { alert('올바른 번호를 입력하세요.'); return; }
+  } else {
+    if (!confirm(`상태를 '${TRANS_LABEL[to]||to}'(으)로 변경하시겠습니까?`)) return;
+  }
+  const res = await apiFetch(`/api/resource/ledgers/${id}/transition`, { method:'POST', body: JSON.stringify({ to_status: to, reclaim_reason }) });
+  if (!res) return;
+  if (res.ok) { showToast('상태가 변경되었습니다.', 'success'); loadDetail(); }
+  else { const e = await res.json().catch(()=>({})); showToast(e.detail || '전이 실패', 'error'); }
+}
+
+async function deleteLedger(id) {
+  if (!confirm('이 자원 대장 항목을 삭제하시겠습니까?')) return;
+  const res = await apiFetch(`/api/resource/ledgers/${id}`, { method:'DELETE' });
+  if (res && (res.ok || res.status===204)) { showToast('삭제되었습니다.', 'success'); loadDetail(); }
+}
+
+// ── 유틸 ─────────────────────────────────────────────────────
+function fmtNum(n){ return (n==null||n==='')?'-':(Math.round(n*100)/100); }
+function fmtTime(s){ return s ? String(s).replace('T',' ').slice(0,16) : ''; }
+function showToast(msg, type='info') {
+  const bg = type==='error'?'#ef4444':type==='success'?'#10b981':'#1e293b';
+  const t = document.createElement('div'); t.textContent = msg;
+  t.style.cssText = `position:fixed;bottom:24px;right:24px;background:${bg};color:#fff;padding:10px 18px;border-radius:8px;font-size:13px;z-index:9999;opacity:0;transition:opacity .2s;`;
+  document.body.appendChild(t); requestAnimationFrame(()=>t.style.opacity='1');
+  setTimeout(()=>{t.style.opacity='0';setTimeout(()=>t.remove(),200);},3000);
+}
+function escapeHtml(s){ if(s==null)return''; return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+document.addEventListener('click', e => { if (e.target.classList.contains('modal-overlay')) e.target.classList.remove('open'); });
+</script>
+{% endblock %}

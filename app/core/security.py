@@ -16,6 +16,20 @@ def verify_password(password: str, username: str, secret_key: str, expected_hash
     return hmac.compare_digest(candidate, expected_hash)
 
 
+PASSWORD_MIN_LENGTH = 8
+
+
+def validate_password_strength(password: str) -> None:
+    """비밀번호 정책 검증. 위반 시 ValueError. (최소 길이 + 영문/숫자 포함)"""
+    pw = password or ""
+    if len(pw) < PASSWORD_MIN_LENGTH:
+        raise ValueError(f"비밀번호는 최소 {PASSWORD_MIN_LENGTH}자 이상이어야 합니다.")
+    has_alpha = any(c.isalpha() for c in pw)
+    has_digit = any(c.isdigit() for c in pw)
+    if not (has_alpha and has_digit):
+        raise ValueError("비밀번호는 영문과 숫자를 모두 포함해야 합니다.")
+
+
 def create_access_token(*, username: str, role: str, secret_key: str, expires_in_minutes: int) -> str:
     expires_at = datetime.now(UTC) + timedelta(minutes=expires_in_minutes)
     payload = {"sub": username, "role": role, "exp": int(expires_at.timestamp())}

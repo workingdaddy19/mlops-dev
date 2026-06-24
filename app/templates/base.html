@@ -82,6 +82,20 @@
 
     <div class="sidebar-divider"></div>
 
+    <!-- 분석 자원 관리 (admin only — shown by JS) -->
+    <div class="sidebar-group open" id="grp-resource" style="display:none;">
+      <button class="sidebar-group-btn" onclick="toggleGroup('grp-resource')">
+        <span class="s-icon">🧮</span>
+        <span class="s-label">분석자원</span>
+        <span class="s-arrow"></span>
+      </button>
+      <div class="sidebar-sub">
+        <a href="/resource/dashboard" class="sidebar-subitem {% if active_page=='resource-dashboard' %}active{% endif %}"><span class="s-icon">📊</span><span class="s-label">자원 대시보드</span></a>
+        <a href="/resource/projects" class="sidebar-subitem {% if active_page=='resource-projects' %}active{% endif %}"><span class="s-icon">🗂️</span><span class="s-label">분석 과제</span></a>
+        <a href="/admin/resource-reclaim" class="sidebar-subitem {% if active_page=='resource-reclaim' %}active{% endif %}"><span class="s-icon">♻️</span><span class="s-label">회수 현황</span></a>
+      </div>
+    </div>
+
     <!-- Management (admin only — shown by JS) -->
     <div class="sidebar-group open" id="grp-mgmt" style="display:none;">
       <button class="sidebar-group-btn" onclick="toggleGroup('grp-mgmt')">
@@ -92,6 +106,7 @@
       <div class="sidebar-sub">
         <a href="/admin/users"    class="sidebar-subitem {% if active_page=='admin-users'    %}active{% endif %}"><span class="s-icon">👥</span><span class="s-label">Users</span></a>
         <a href="/admin/permission-requests" class="sidebar-subitem {% if active_page=='admin-permission-requests' %}active{% endif %}"><span class="s-icon">🔑</span><span class="s-label">권한 신청 관리</span></a>
+        <a href="/admin/access-log" class="sidebar-subitem {% if active_page=='admin-access-log' %}active{% endif %}"><span class="s-icon">🛡️</span><span class="s-label">접속 기록</span></a>
         <a href="/admin/settings" class="sidebar-subitem {% if active_page=='admin-settings' %}active{% endif %}"><span class="s-icon">🔧</span><span class="s-label">Settings</span></a>
       </div>
     </div>
@@ -103,7 +118,10 @@
       <span class="user-avatar">👤</span>
       <span id="nav-username" class="user-name"></span>
     </div>
-    <button class="btn-sidebar-logout" onclick="logout()" title="로그아웃">
+    <button class="btn-sidebar-logout" onclick="openChangePwModal(false)" title="비밀번호 변경">
+      <span class="logout-icon">🔑</span>
+    </button>
+    <button class="btn-sidebar-logout" onclick="userLogout()" title="로그아웃">
       <span class="logout-icon">🚪</span>
     </button>
   </div>
@@ -118,6 +136,32 @@
     {% block content %}{% endblock %}
   </div>
 </main>
+
+<!-- 비밀번호 변경 모달 (전 페이지 공통) -->
+<div class="modal-overlay" id="changePwModal">
+  <div class="modal-box" style="width:420px; max-width:95vw;">
+    <div class="modal-title">비밀번호 변경</div>
+    <div id="changePwForced" style="display:none; font-size:13px; color:#92400e; background:#fef3c7; padding:9px 12px; border-radius:6px; margin-bottom:14px;">
+      🔒 보안을 위해 비밀번호를 변경해야 계속 이용할 수 있습니다.
+    </div>
+    <div class="form-group">
+      <label class="form-label">현재 비밀번호 *</label>
+      <input id="cp-current" class="form-input" type="password" autocomplete="current-password">
+    </div>
+    <div class="form-group">
+      <label class="form-label">새 비밀번호 * <span style="font-weight:400; color:var(--text-muted); font-size:11px;">(8자 이상, 영문+숫자 포함)</span></label>
+      <input id="cp-new" class="form-input" type="password" autocomplete="new-password">
+    </div>
+    <div class="form-group">
+      <label class="form-label">새 비밀번호 확인 *</label>
+      <input id="cp-confirm" class="form-input" type="password" autocomplete="new-password">
+    </div>
+    <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:20px;">
+      <button class="btn btn-secondary" id="cp-cancel" onclick="closeChangePwModal()">취소</button>
+      <button class="btn btn-primary" onclick="submitChangePassword()">변경</button>
+    </div>
+  </div>
+</div>
 
 <script src="/static/js/app.js"></script>
 {% block scripts %}{% endblock %}

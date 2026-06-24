@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+
+{% block title %}자원 대시보드 - AI 데이터 분석{% endblock %}
+
+{% block breadcrumb %}
+  <span>분석자원</span>
+  <span class="sep">›</span>
+  <span class="current">자원 대시보드</span>
+{% endblock %}
+
+{% block content %}
+<div class="card-title">📊 분석 자원 현황</div>
+
+<!-- 요약 카드 -->
+<div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:14px; margin:12px 0 18px;">
+  <div class="card" style="text-align:center;"><div style="font-size:12px;color:var(--text-muted);">활성 자원</div><div id="c-active" style="font-size:28px;font-weight:700;color:#0d9488;">-</div></div>
+  <div class="card" style="text-align:center;"><div style="font-size:12px;color:var(--text-muted);">만료 임박 (D-14)</div><div id="c-soon" style="font-size:28px;font-weight:700;color:#d97706;">-</div></div>
+  <div class="card" style="text-align:center;"><div style="font-size:12px;color:var(--text-muted);">만료 경과 (회수대상)</div><div id="c-over" style="font-size:28px;font-weight:700;color:#dc2626;">-</div></div>
+  <div class="card" style="text-align:center;"><div style="font-size:12px;color:var(--text-muted);">활성 용량 합계</div><div id="c-cap" style="font-size:17px;font-weight:700;margin-top:6px;">-</div></div>
+</div>
+
+<div class="card" style="margin-bottom:16px;">
+  <div class="card-title" style="font-size:15px;">⏰ 만료 경과 (즉시 회수 검토)</div>
+  <div style="overflow-x:auto;"><table class="data-table"><thead>
+    <tr><th>네임스페이스/노드</th><th style="width:140px;">용량</th><th style="width:110px;">ITSM</th><th style="width:180px;">만료</th></tr>
+  </thead><tbody id="over-tbody"><tr><td colspan="4" style="text-align:center;color:var(--text-muted);padding:16px;">로딩 중...</td></tr></tbody></table></div>
+</div>
+
+<div class="card">
+  <div class="card-title" style="font-size:15px;">🟠 만료 임박 (D-14 이내)</div>
+  <div style="overflow-x:auto;"><table class="data-table"><thead>
+    <tr><th>네임스페이스/노드</th><th style="width:140px;">용량</th><th style="width:110px;">ITSM</th><th style="width:180px;">만료</th></tr>
+  </thead><tbody id="soon-tbody"><tr><td colspan="4" style="text-align:center;color:var(--text-muted);padding:16px;">로딩 중...</td></tr></tbody></table></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', load);
+
+async function load() {
+  const res = await apiFetch('/api/resource/dashboard');
+  if (!res) return;
+  if (res.status === 403) { document.getElementById('over-tbody').innerHTML = '<tr><td colspan="4" style="text-align:center;color:#ef4444;padding:16px;">⛔ 관리자 권한이 필요합니다.</td></tr>'; return; }
+  const d = await res.json();
+  document.getElementById('c-active').textContent = d.active_count;
+  document.getElementById('c-soon').textContent = d.expiring_count;
+  document.getElementById('c-over').textContent = d.overdue_count;
+  const t = d.capacity_totals || {};
+  document.getElementById('c-cap').textContent = `${t.vcpu||0} vCPU / ${t.mem_gb||0} GB${t.gpu?` / GPU ${t.gpu}`:''}`;
+
+  renderRows('over-tbody', d.overdue || [], true);
+  renderRows('soon-tbody', d.expiring || [], false);
+}
+
+function renderRows(tbodyId, list, overdue) {
+  const tbody = document.getElementById(tbodyId);
+  if (!list.length) { tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;color:var(--text-muted);padding:16px;">해당 자원이 없습니다.</td></tr>`; return; }
+  tbody.innerHTML = list.map(l => {
+    const cap = `${fmtNum(l.alloc_vcpu)}vCPU / ${fmtNum(l.alloc_mem_gb)}GB${l.alloc_gpu?` / GPU${l.alloc_gpu}`:''}`;
+    const d = l.days_to_expiry;
+    const exp = overdue ? `${l.expires_at} <span style="color:#dc2626;font-weight:600;">(${Math.abs(d)}일 경과)</span>`
+                        : `${l.expires_at} <span style="color:#d97706;font-weight:600;">(D-${d})</span>`;
+    return `<tr>
+      <td style="font-size:12px;">${escapeHtml(l.namespace||'-')}<br><span style="color:var(--text-muted);">${escapeHtml(l.node_group||'')} ${escapeHtml(l.jupyter_server_type||'')}</span></td>
+      <td style="font-size:12px;">${cap}</td>
+      <td style="font-size:12px;">${escapeHtml(l.itsm_ticket||'-')}</td>
+      <td style="font-size:12px;">${exp}</td>
+    </tr>`;
+  }).join('');
+}
+
+function fmtNum(n){ return (n==null||n==='')?'-':(Math.round(n*100)/100); }
+function escapeHtml(s){ if(s==null)return''; return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+</script>
+{% endblock %}

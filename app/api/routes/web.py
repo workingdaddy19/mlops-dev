@@ -114,6 +114,31 @@ async def permissions_page(request: Request):
         {"request": request, "active_page": "permissions"})
 
 
+# ── 분석 자원 관리 ──────────────────────────────────────────────────────────
+@router.get("/resource/dashboard", response_class=HTMLResponse, include_in_schema=False)
+async def resource_dashboard_page(request: Request):
+    return templates.TemplateResponse("pages/resource_dashboard.html",
+        {"request": request, "active_page": "resource-dashboard"})
+
+
+@router.get("/resource/projects", response_class=HTMLResponse, include_in_schema=False)
+async def resource_projects_page(request: Request):
+    return templates.TemplateResponse("pages/resource_projects.html",
+        {"request": request, "active_page": "resource-projects"})
+
+
+@router.get("/resource/projects/{project_id}", response_class=HTMLResponse, include_in_schema=False)
+async def resource_project_detail_page(request: Request, project_id: int):
+    return templates.TemplateResponse("pages/resource_project_detail.html",
+        {"request": request, "active_page": "resource-projects", "project_id": project_id})
+
+
+@router.get("/admin/resource-reclaim", response_class=HTMLResponse, include_in_schema=False)
+async def resource_reclaim_page(request: Request):
+    return templates.TemplateResponse("pages/resource_reclaim.html",
+        {"request": request, "active_page": "resource-reclaim"})
+
+
 # ── Admin ─────────────────────────────────────────────────────────────────
 @router.get("/admin/users", response_class=HTMLResponse, include_in_schema=False)
 async def admin_users_page(request: Request):
@@ -125,6 +150,12 @@ async def admin_users_page(request: Request):
 async def admin_permission_requests_page(request: Request):
     return templates.TemplateResponse("pages/admin_permission_requests.html",
         {"request": request, "active_page": "admin-permission-requests"})
+
+
+@router.get("/admin/access-log", response_class=HTMLResponse, include_in_schema=False)
+async def admin_access_log_page(request: Request):
+    return templates.TemplateResponse("pages/admin_access_log.html",
+        {"request": request, "active_page": "admin-access-log"})
 
 
 @router.get("/admin/settings", response_class=HTMLResponse, include_in_schema=False)

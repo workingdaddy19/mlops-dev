@@ -1,13 +1,14 @@
 """Admin API — 사용자 관리 + 시스템 설정 관리 (admin role 전용)."""
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, get_db, require_admin
+from app.api.routes.access_log import record_event
 from app.core.config import get_settings
-from app.core.security import hash_password
+from app.core.security import hash_password, validate_password_strength
 from app.models.user import User
 from app.models.user_permission import VALID_FEATURES
 from app.repositories.settings_repo import SettingsRepository
@@ -28,6 +29,7 @@ class UserAdminRead(BaseModel):
     id: int
     username: str
     name: str
+    department: str | None = None
     role: str
     created_at: str | None = None
 
@@ -40,6 +42,7 @@ class UserAdminRead(BaseModel):
             id=user.id,
             username=user.username,
             name=user.name,
+            department=user.department,
             role=user.role,
             created_at=str(user.created_at) if user.created_at else None,
         )
@@ -49,12 +52,18 @@ class UserCreate(BaseModel):
     username: str
     password: str
     name: str = ""
+    department: str | None = None
     role: str = "user"
 
 
 class UserUpdate(BaseModel):
     name: str | None = None
+    department: str | None = None
     role: str | None = None
+
+
+class PasswordReset(BaseModel):
+    new_password: str
 
 
 class SettingUpdate(BaseModel):
@@ -104,7 +113,13 @@ def create_user(
     pw_hash = hash_password(body.password, body.username, secret_key)
     display_name = body.name or body.username
 
-    user = User(username=body.username, password_hash=pw_hash, name=display_name, role=body.role)
+    user = User(
+        username=body.username,
+        password_hash=pw_hash,
+        name=display_name,
+        department=body.department or None,
+        role=body.role,
+    )
     created = repo.create(user)
     return UserAdminRead.from_orm_user(created)
 
@@ -127,12 +142,46 @@ def update_user(
 
     if body.name is not None:
         user.name = body.name
+    if body.department is not None:
+        user.department = body.department or None
     if body.role is not None:
         user.role = body.role
 
     db.commit()
     db.refresh(user)
     return UserAdminRead.from_orm_user(user)
+
+
+@router.put("/users/{user_id}/password")
+def reset_user_password(
+    user_id: int,
+    body: PasswordReset,
+    request: Request,
+    db: Session = Depends(get_db),
+    admin: UserRead = Depends(require_admin),
+):
+    """사용자 비밀번호 초기화 (admin only). 초기화 후 다음 로그인 시 변경 강제."""
+    repo = UserRepository(db)
+    user = repo.get_by_id(user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
+
+    try:
+        validate_password_strength(body.new_password)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+    secret_key = get_settings().secret_key.get_secret_value()
+    user.password_hash = hash_password(body.new_password, user.username, secret_key)
+    user.must_change_password = True
+    db.commit()
+
+    record_event(
+        db, request, user_id=user.id, username=user.username,
+        name=user.name, department=user.department,
+        menu=f"비밀번호 초기화(by {admin.username})", action="password_reset",
+    )
+    return {"message": f"'{user.username}' 사용자의 비밀번호가 초기화되었습니다. 다음 로그인 시 변경이 필요합니다."}
 
 
 @router.delete("/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT)

@@ -8,6 +8,7 @@ from app.api.router import api_router
 from app.api.routes.web import router as web_router
 from app.core.config import get_settings
 from app.core.database import Base, get_engine
+from app.core.schema_upgrade import ensure_schema_upgrades
 from app.services.auth_service import ensure_default_users
 from app.services.settings_seed import ensure_default_settings
 
@@ -16,6 +17,7 @@ from app.services.settings_seed import ensure_default_settings
 async def lifespan(_: FastAPI):
     engine = get_engine()
     Base.metadata.create_all(bind=engine)
+    ensure_schema_upgrades(engine)  # 기존 테이블 누락 컬럼 보강(create_all 보완)
     ensure_default_users(engine)
     ensure_default_settings(engine)
     yield

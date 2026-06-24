@@ -26,7 +26,12 @@ class AuthService:
             secret_key=self.secret_key,
             expires_in_minutes=self.ttl_minutes,
         )
-        return LoginResponse(access_token=token, username=user.username, role=user.role)
+        return LoginResponse(
+            access_token=token,
+            username=user.username,
+            role=user.role,
+            must_change_password=bool(user.must_change_password),
+        )
 
     def get_current_user(self, token: str) -> UserRead:
         payload = decode_access_token(token, self.secret_key)

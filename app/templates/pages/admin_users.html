@@ -24,14 +24,15 @@
           <th style="width:48px;">ID</th>
           <th>사용자명</th>
           <th>이름</th>
+          <th style="width:120px;">부서</th>
           <th style="width:80px;">역할</th>
-          <th style="min-width:240px;">기능 권한</th>
-          <th style="width:130px;">생성일</th>
-          <th style="width:130px;">작업</th>
+          <th style="min-width:220px;">기능 권한</th>
+          <th style="width:120px;">생성일</th>
+          <th style="width:210px;">작업</th>
         </tr>
       </thead>
       <tbody id="user-tbody">
-        <tr><td colspan="7" style="text-align:center; color:var(--text-muted); padding:24px;">로딩 중...</td></tr>
+        <tr><td colspan="8" style="text-align:center; color:var(--text-muted); padding:24px;">로딩 중...</td></tr>
       </tbody>
     </table>
   </div>
@@ -52,6 +53,10 @@
     <div class="form-group">
       <label class="form-label">이름 (표시명)</label>
       <input id="f-name" class="form-input" placeholder="비워두면 사용자명과 동일">
+    </div>
+    <div class="form-group">
+      <label class="form-label">부서</label>
+      <input id="f-department" class="form-input" placeholder="예: AI데이터지원팀">
     </div>
     <div class="form-group">
       <label class="form-label">역할</label>
@@ -81,6 +86,10 @@
       <input id="e-name" class="form-input">
     </div>
     <div class="form-group">
+      <label class="form-label">부서</label>
+      <input id="e-department" class="form-input" placeholder="예: AI데이터지원팀">
+    </div>
+    <div class="form-group">
       <label class="form-label">역할</label>
       <select id="e-role" class="form-select" onchange="onRoleChange()">
         <option value="user">user</option>
@@ -95,7 +104,7 @@
         <label class="perm-toggle"><input type="checkbox" name="e-perm" value="s3"> S3 스토리지</label>
         <label class="perm-toggle"><input type="checkbox" name="e-perm" value="athena"> Athena DB</label>
         <label class="perm-toggle"><input type="checkbox" name="e-perm" value="jupyter"> Jupyter</label>
-        <label class="perm-toggle"><input type="checkbox" name="e-perm" value="mlflow"> MLFlow</label>
+        <label class="perm-toggle"><input type="checkbox" name="e-perm" value="mlflow"> Experiments &amp; Pipelines</label>
         <label class="perm-toggle"><input type="checkbox" name="e-perm" value="airflow"> Airflow</label>
       </div>
       <div id="perm-admin-note" style="display:none; font-size:11px; color:var(--text-muted); margin-top:6px;">
@@ -106,6 +115,26 @@
     <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:20px;">
       <button class="btn btn-secondary" onclick="closeEditModal()">취소</button>
       <button class="btn btn-primary" onclick="submitEdit()">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- 비밀번호 초기화 모달 -->
+<div class="modal-overlay" id="resetPwModal">
+  <div class="modal-box">
+    <div class="modal-title">비밀번호 초기화</div>
+    <input type="hidden" id="r-id">
+    <p style="font-size:13px; color:var(--text-muted); margin:0 0 14px; line-height:1.6;">
+      <strong id="r-username"></strong> 사용자의 비밀번호를 초기화합니다.<br>
+      초기화 후 해당 사용자는 <strong>다음 로그인 시 비밀번호를 반드시 변경</strong>해야 합니다.
+    </p>
+    <div class="form-group">
+      <label class="form-label">새 비밀번호 * <span style="font-weight:400; color:var(--text-muted); font-size:11px;">(8자 이상, 영문+숫자 포함)</span></label>
+      <input id="r-new" class="form-input" type="text" placeholder="새 비밀번호 (사용자에게 전달)">
+    </div>
+    <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:20px;">
+      <button class="btn btn-secondary" onclick="closeResetModal()">취소</button>
+      <button class="btn btn-primary" onclick="submitReset()">초기화</button>
     </div>
   </div>
 </div>
@@ -131,7 +160,7 @@
 
 <script>
 const FEATURES = ['s3', 'athena', 'jupyter', 'mlflow', 'airflow'];
-const FEAT_LABEL = { s3:'S3', athena:'Athena', jupyter:'Jupyter', mlflow:'MLFlow', airflow:'Airflow' };
+const FEAT_LABEL = { s3:'S3', athena:'Athena', jupyter:'Jupyter', mlflow:'Experiments & Pipelines', airflow:'Airflow' };
 
 document.addEventListener('DOMContentLoaded', loadUsers);
 
@@ -139,12 +168,12 @@ document.addEventListener('DOMContentLoaded', loadUsers);
 async function loadUsers() {
   const tbody = document.getElementById('user-tbody');
   const statusEl = document.getElementById('user-status');
-  tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:24px;">로딩 중...</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:24px;">로딩 중...</td></tr>';
 
   const res = await apiFetch('/api/admin/users');
   if (!res) return;
   if (res.status === 403) {
-    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#ef4444;padding:24px;">⛔ 관리자 권한이 필요합니다.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#ef4444;padding:24px;">⛔ 관리자 권한이 필요합니다.</td></tr>';
     return;
   }
 
@@ -157,6 +186,7 @@ async function loadUsers() {
       <td>${u.id}</td>
       <td><strong>${escapeHtml(u.username)}</strong></td>
       <td>${escapeHtml(u.name)}</td>
+      <td style="font-size:13px;">${escapeHtml(u.department || '-')}</td>
       <td>
         <span style="display:inline-block; padding:2px 8px; border-radius:99px; font-size:11px; font-weight:600;
           background:${u.role==='admin'?'#fce7f3':'#dbeafe'};
@@ -173,7 +203,9 @@ async function loadUsers() {
       <td style="color:var(--text-muted); font-size:12px;">${u.created_at ? u.created_at.slice(0,10) : '-'}</td>
       <td>
         <button class="btn btn-secondary" style="padding:4px 10px;font-size:12px;"
-          onclick="openEditModal(${u.id},'${escapeAttr(u.username)}','${escapeAttr(u.name)}','${u.role}')">수정</button>
+          onclick="openEditModal(${u.id},'${escapeAttr(u.username)}','${escapeAttr(u.name)}','${escapeAttr(u.department || '')}','${u.role}')">수정</button>
+        <button class="btn btn-secondary" style="padding:4px 10px;font-size:12px;margin-left:4px;"
+          onclick="openResetModal(${u.id},'${escapeAttr(u.username)}')">비번초기화</button>
         ${me && me.id !== u.id
           ? `<button class="btn btn-danger" style="padding:4px 10px;font-size:12px;margin-left:4px;"
               onclick="deleteUser(${u.id},'${escapeAttr(u.username)}')">삭제</button>`
@@ -201,7 +233,7 @@ async function loadPermBadges(userId) {
 
 // ── 추가 모달 ────────────────────────────────────────────────────
 function openCreateModal() {
-  ['f-username','f-password','f-name'].forEach(id => document.getElementById(id).value = '');
+  ['f-username','f-password','f-name','f-department'].forEach(id => document.getElementById(id).value = '');
   document.getElementById('f-role').value = 'user';
   document.getElementById('createModal').classList.add('open');
 }
@@ -210,15 +242,16 @@ function closeCreateModal() {
 }
 
 async function submitCreate() {
-  const username = document.getElementById('f-username').value.trim();
-  const password = document.getElementById('f-password').value.trim() || username;
-  const name     = document.getElementById('f-name').value.trim() || username;
-  const role     = document.getElementById('f-role').value;
+  const username   = document.getElementById('f-username').value.trim();
+  const password   = document.getElementById('f-password').value.trim() || username;
+  const name       = document.getElementById('f-name').value.trim() || username;
+  const department = document.getElementById('f-department').value.trim();
+  const role       = document.getElementById('f-role').value;
   if (!username) { alert('사용자명을 입력하세요.'); return; }
 
   const res = await apiFetch('/api/admin/users', {
     method: 'POST',
-    body: JSON.stringify({ username, password, name, role }),
+    body: JSON.stringify({ username, password, name, department, role }),
   });
   if (!res) return;
   if (res.ok) {
@@ -232,11 +265,12 @@ async function submitCreate() {
 }
 
 // ── 수정 모달 ────────────────────────────────────────────────────
-async function openEditModal(id, username, name, role) {
-  document.getElementById('e-id').value       = id;
-  document.getElementById('e-username').value = username;
-  document.getElementById('e-name').value     = name;
-  document.getElementById('e-role').value     = role;
+async function openEditModal(id, username, name, department, role) {
+  document.getElementById('e-id').value         = id;
+  document.getElementById('e-username').value   = username;
+  document.getElementById('e-name').value       = name;
+  document.getElementById('e-department').value = department || '';
+  document.getElementById('e-role').value       = role;
   onRoleChange();
 
   // 권한 로드
@@ -262,13 +296,14 @@ function closeEditModal() {
 }
 
 async function submitEdit() {
-  const id   = document.getElementById('e-id').value;
-  const name = document.getElementById('e-name').value.trim();
-  const role = document.getElementById('e-role').value;
+  const id         = document.getElementById('e-id').value;
+  const name       = document.getElementById('e-name').value.trim();
+  const department = document.getElementById('e-department').value.trim();
+  const role       = document.getElementById('e-role').value;
 
   const userRes = await apiFetch(`/api/admin/users/${id}`, {
     method: 'PUT',
-    body: JSON.stringify({ name, role }),
+    body: JSON.stringify({ name, department, role }),
   });
   if (!userRes || !userRes.ok) {
     const err = userRes ? await userRes.json() : {};
@@ -288,6 +323,35 @@ async function submitEdit() {
   closeEditModal();
   loadUsers();
   showToast('저장되었습니다.', 'success');
+}
+
+// ── 비밀번호 초기화 ──────────────────────────────────────────────
+function openResetModal(id, username) {
+  document.getElementById('r-id').value = id;
+  document.getElementById('r-username').textContent = username;
+  document.getElementById('r-new').value = '';
+  document.getElementById('resetPwModal').classList.add('open');
+}
+function closeResetModal() {
+  document.getElementById('resetPwModal').classList.remove('open');
+}
+async function submitReset() {
+  const id = document.getElementById('r-id').value;
+  const newPw = document.getElementById('r-new').value.trim();
+  if (!newPw) { alert('새 비밀번호를 입력하세요.'); return; }
+
+  const res = await apiFetch(`/api/admin/users/${id}/password`, {
+    method: 'PUT',
+    body: JSON.stringify({ new_password: newPw }),
+  });
+  if (!res) return;
+  if (res.ok) {
+    closeResetModal();
+    showToast('비밀번호가 초기화되었습니다.', 'success');
+  } else {
+    const err = await res.json().catch(() => ({}));
+    showToast(err.detail || '초기화 실패', 'error');
+  }
 }
 
 // ── 삭제 ─────────────────────────────────────────────────────────
