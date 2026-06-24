@@ -63,6 +63,8 @@ class SettingsService:
     def _env_fallback(self, key: str, default: str) -> str:
         mapping: dict[str, Any] = {
             "MLFLOW_BASE_URL":   self._env.mlflow_base_url,
+            "KFP_BASE_URL":      self._env.kfp_base_url,
+            "KATIB_BASE_URL":    self._env.katib_base_url,
             "JUPYTER_BASE_URL":  self._env.jupyter_base_url,
             "JUPYTER_ENVS":      self._env.jupyter_envs,
             "ATHENA_DATABASE":   self._env.athena_database,

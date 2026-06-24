@@ -41,6 +41,11 @@ class Settings(BaseSettings):
     # ── MLFlow UI (외부 접속용) ──────────────────────────────────────
     mlflow_base_url: str = Field(default="http://mlflow.mlops.click", alias="MLFLOW_BASE_URL")
 
+    # ── Kubeflow Pipelines / Katib (Experiments & Pipelines 페이지 링크) ──
+    #   비민감 URL — 코드 기본값 + DB(system_settings, 관리자 Settings)에서 관리
+    kfp_base_url: str = Field(default="http://kfp.kubeflow.mlops.click/", alias="KFP_BASE_URL")
+    katib_base_url: str = Field(default="http://katib.kubeflow.mlops.click/katib/", alias="KATIB_BASE_URL")
+
     # ── Inference (추론 API 호출 — 별도 Pod의 invest-app 서비스) ──────
     # 포탈은 추론을 자체 처리하지 않고 invest-app(=invest-inference) 서비스를 HTTP 호출만 한다.
     # api.mlops.click 도메인 등록 완료 → 외부 인터넷에서도 직접 호출 가능 (Host 헤더 불필요)

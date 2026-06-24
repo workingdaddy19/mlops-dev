@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+
+{% block title %}Experiments & Pipelines - AI 데이터 분석{% endblock %}
+
+{% block breadcrumb %}
+  <span>Models</span>
+  <span class="sep">›</span>
+  <span class="current">Experiments &amp; Pipelines</span>
+{% endblock %}
+
+{% block content %}
+<div id="perm-warning" style="display:none; margin-bottom:16px; padding:12px 14px; border-radius:8px; background:#fef2f2; color:#991b1b; font-size:13px;">
+  🔒 접근 권한이 없습니다. 관리자에게 <strong>MLFlow</strong> 권한을 요청하세요. (권한 신청 메뉴 이용)
+</div>
+
+<div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:16px;">
+
+  <!-- 1. Model Experiments (MLflow) -->
+  <div class="card" style="text-align:center; padding:32px 20px; display:flex; flex-direction:column;">
+    <div style="font-size:40px; margin-bottom:12px;">📈</div>
+    <div style="font-size:16px; font-weight:700; margin-bottom:4px;">Model Experiments</div>
+    <div style="font-size:12px; color:var(--text-muted); margin-bottom:6px;">MLflow — 실험·런·모델 레지스트리</div>
+    <div style="font-size:11px; color:var(--text-muted); font-family:monospace; word-break:break-all; margin-bottom:16px;">{{ mlflow_url }}</div>
+    <button class="btn btn-primary open-btn" data-url="{{ mlflow_url }}" style="margin-top:auto;">🚀 Model Experiments 열기</button>
+    <div id="mlflow-health" style="font-size:11px; color:var(--text-muted); margin-top:10px;">상태 확인 중...</div>
+  </div>
+
+  <!-- 2. Model Pipeline (Kubeflow Pipelines) -->
+  <div class="card" style="text-align:center; padding:32px 20px; display:flex; flex-direction:column;">
+    <div style="font-size:40px; margin-bottom:12px;">🔧</div>
+    <div style="font-size:16px; font-weight:700; margin-bottom:4px;">Model Pipeline</div>
+    <div style="font-size:12px; color:var(--text-muted); margin-bottom:6px;">Kubeflow Pipelines — 학습 파이프라인</div>
+    <div style="font-size:11px; color:var(--text-muted); font-family:monospace; word-break:break-all; margin-bottom:16px;">{{ kfp_url }}</div>
+    <button class="btn btn-primary open-btn" data-url="{{ kfp_url }}" style="margin-top:auto;">🚀 Model Pipeline 열기</button>
+  </div>
+
+  <!-- 3. Hyperparameter Tuning (Katib) -->
+  <div class="card" style="text-align:center; padding:32px 20px; display:flex; flex-direction:column;">
+    <div style="font-size:40px; margin-bottom:12px;">🎯</div>
+    <div style="font-size:16px; font-weight:700; margin-bottom:4px;">Hyperparameter Tuning</div>
+    <div style="font-size:12px; color:var(--text-muted); margin-bottom:6px;">Katib — 하이퍼파라미터 최적화(HPO)</div>
+    <div style="font-size:11px; color:var(--text-muted); font-family:monospace; word-break:break-all; margin-bottom:16px;">{{ katib_url }}</div>
+    <button class="btn btn-primary open-btn" data-url="{{ katib_url }}" style="margin-top:auto;">🚀 Hyperparameter Tuning 열기</button>
+  </div>
+
+</div>
+
+<div class="card" style="margin-top:16px;">
+  <div class="card-title" style="font-size:13px; margin-bottom:8px;">💡 사용 안내</div>
+  <ul style="font-size:13px; color:var(--text-secondary); line-height:1.8; margin:0; padding-left:20px;">
+    <li>버튼 클릭 시 각 도구 UI가 <strong>새 탭</strong>으로 열립니다.</li>
+    <li><strong>Model Experiments(MLflow)</strong>: 실험/런/모델 레지스트리/아티팩트 관리.</li>
+    <li><strong>Model Pipeline(Kubeflow)</strong>: 학습 파이프라인 정의·실행·모니터링.</li>
+    <li><strong>Hyperparameter Tuning(Katib)</strong>: HPO 실험 생성·결과 분석.</li>
+    <li>접속 URL은 관리자 <strong>Settings</strong> 화면에서 변경할 수 있습니다(재배포 불필요).</li>
+  </ul>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const MLFLOW_URL = {{ mlflow_url | tojson }};
+
+document.addEventListener('DOMContentLoaded', async () => {
+  // 권한 확인 — 통합 페이지는 mlflow 권한으로 게이팅
+  const perms = await loadMyPermissions();
+  const allowed = perms.includes('mlflow');
+  const buttons = document.querySelectorAll('.open-btn');
+
+  if (!allowed) {
+    document.getElementById('perm-warning').style.display = 'block';
+    buttons.forEach(b => {
+      b.disabled = true;
+      b.title = '관리자에게 MLFlow 접근 권한을 요청하세요.';
+    });
+  } else {
+    buttons.forEach(b => b.addEventListener('click', () => {
+      const url = b.getAttribute('data-url');
+      if (url) window.open(url, '_blank');
+    }));
+  }
+
+  // MLflow 서비스 상태 (실패해도 버튼은 동작)
+  const healthEl = document.getElementById('mlflow-health');
+  try {
+    const res = await apiFetch('/api/mlflow/health');
+    if (res && res.ok) {
+      const d = await res.json();
+      healthEl.innerHTML = d.status === 'ok'
+        ? '<span style="color:#10b981;">● 서비스 정상</span>'
+        : '<span style="color:#ef4444;">● 서비스 응답 없음</span>';
+    } else {
+      healthEl.innerHTML = '<span style="color:#f59e0b;">● 상태 확인 불가</span>';
+    }
+  } catch {
+    healthEl.innerHTML = '<span style="color:#f59e0b;">● 상태 확인 불가</span>';
+  }
+});
+</script>
+{% endblock %}

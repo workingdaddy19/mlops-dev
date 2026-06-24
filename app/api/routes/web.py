@@ -1,6 +1,11 @@
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
+from sqlalchemy.orm import Session
+
+from app.api.deps import get_db
+from app.core.config import get_settings
+from app.services.settings_service import SettingsService
 
 router = APIRouter(tags=["web"])
 templates = Jinja2Templates(directory="app/templates")
@@ -45,10 +50,27 @@ async def jupyter_page(request: Request):
 
 
 # ── Models ────────────────────────────────────────────────────────────────
-@router.get("/aiml/mlflow", response_class=HTMLResponse, include_in_schema=False)
-async def mlflow_page(request: Request):
-    return templates.TemplateResponse("pages/mlflow.html",
-        {"request": request, "active_page": "mlflow"})
+@router.get("/aiml/experiments", response_class=HTMLResponse, include_in_schema=False)
+async def experiments_page(request: Request, db: Session = Depends(get_db)):
+    """Experiments & Pipelines — MLflow / Kubeflow Pipelines / Katib 진입점.
+
+    3개 URL은 코드 기본값 + DB(system_settings, 관리자 Settings)에서 관리.
+    """
+    settings = get_settings()
+    svc = SettingsService(db)
+    return templates.TemplateResponse("pages/experiments.html", {
+        "request": request,
+        "active_page": "experiments",
+        "mlflow_url": svc.get("MLFLOW_BASE_URL", settings.mlflow_base_url),
+        "kfp_url":    svc.get("KFP_BASE_URL", settings.kfp_base_url),
+        "katib_url":  svc.get("KATIB_BASE_URL", settings.katib_base_url),
+    })
+
+
+@router.get("/aiml/mlflow", include_in_schema=False)
+async def mlflow_page_redirect():
+    """구 경로 호환 — 통합 페이지로 리다이렉트."""
+    return RedirectResponse(url="/aiml/experiments")
 
 
 # ── Notice ────────────────────────────────────────────────────────────────

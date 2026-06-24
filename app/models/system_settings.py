@@ -10,7 +10,19 @@ SETTINGS_SEED = [
     {
         "key": "MLFLOW_BASE_URL",
         "value": "http://mlflow.mlops.click",
-        "label": "MLFlow 접속 URL",
+        "label": "Model Experiments (MLflow) URL",
+        "group": "mlflow",
+    },
+    {
+        "key": "KFP_BASE_URL",
+        "value": "http://kfp.kubeflow.mlops.click/",
+        "label": "Model Pipeline (Kubeflow) URL",
+        "group": "mlflow",
+    },
+    {
+        "key": "KATIB_BASE_URL",
+        "value": "http://katib.kubeflow.mlops.click/katib/",
+        "label": "Hyperparameter Tuning (Katib) URL",
         "group": "mlflow",
     },
     {
