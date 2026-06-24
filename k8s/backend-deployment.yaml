@@ -31,6 +31,13 @@ spec:
           envFrom:
             - secretRef:
                 name: backend-secret
+          # 비민감 설정은 코드 기본값(app/core/config.py) + DB(system_settings)에서 관리.
+          # AWS 리전만 boto3용 일반 env로 주입(비밀 아님).
+          env:
+            - name: AWS_REGION
+              value: "ap-northeast-2"
+            - name: AWS_DEFAULT_REGION
+              value: "ap-northeast-2"
           livenessProbe:
             httpGet:
               path: /health

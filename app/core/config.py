@@ -1,7 +1,7 @@
 from functools import lru_cache
 from urllib.parse import quote_plus
 
-from pydantic import Field, SecretStr
+from pydantic import AliasChoices, Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -9,8 +9,13 @@ class Settings(BaseSettings):
     app_name: str = Field(default="AI 데이터 분석", alias="APP_NAME")
     app_port: int = Field(default=6080, alias="APP_PORT")
 
-    # ── 보안 키 (환경변수 필수) ──────────────────────────────────────
-    secret_key: SecretStr = Field(alias="SECRET_KEY")
+    # ── 애플리케이션 마스터 키 (환경변수 필수) ───────────────────────
+    #   용도: 비밀번호 해시 pepper(salt) + 로그인 JWT 서명 키 (app/core/security.py)
+    #   env 이름: APP_SECRET_KEY  (구 이름 SECRET_KEY 도 호환 인식)
+    #   ⚠️ 값 변경 금지 — 바뀌면 전 사용자 로그인 불가·토큰 무효
+    secret_key: SecretStr = Field(
+        validation_alias=AliasChoices("APP_SECRET_KEY", "SECRET_KEY"),
+    )
 
     access_token_ttl_minutes: int = Field(default=480, alias="ACCESS_TOKEN_TTL_MINUTES")
 
@@ -21,11 +26,13 @@ class Settings(BaseSettings):
     db_user: str = Field(default="mlops", alias="DB_USER")
     db_password: SecretStr = Field(alias="DB_PASSWORD")
 
-    # ── JupyterHub (환경변수 필수: JWT_SECRET, 나머지 선택) ─────────
+    # ── JupyterHub ──────────────────────────────────────────────────
+    #   비민감 설정(URL/ENVS)은 코드 기본값 + DB(system_settings)에서 관리.
+    #   민감값(ADMIN_TOKEN, JWT_SECRET)은 k8s Secret(env)으로 주입.
     jupyter_base_url: str = Field(default="http://jupyterhub.mlops.click", alias="JUPYTER_BASE_URL")
     jupyter_token: str = Field(default="", alias="JUPYTER_TOKEN")
     jupyterhub_admin_token: str = Field(default="", alias="JUPYTERHUB_ADMIN_TOKEN")
-    jupyterhub_jwt_secret: str = Field(alias="JUPYTERHUB_JWT_SECRET")
+    jupyterhub_jwt_secret: str = Field(default="", alias="JUPYTERHUB_JWT_SECRET")
     jupyter_envs: str = Field(
         default='[{"name":"CPU 환경","server":""},{"name":"GPU 환경","server":"gpu"}]',
         alias="JUPYTER_ENVS",
@@ -33,8 +40,6 @@ class Settings(BaseSettings):
 
     # ── MLFlow UI (외부 접속용) ──────────────────────────────────────
     mlflow_base_url: str = Field(default="http://mlflow.mlops.click", alias="MLFLOW_BASE_URL")
-    mlflow_username: str = Field(default="admin", alias="MLFLOW_USERNAME")
-    mlflow_password: SecretStr = Field(default=SecretStr(""), alias="MLFLOW_PASSWORD")
 
     # ── Inference (추론 API 호출 — 별도 Pod의 invest-app 서비스) ──────
     # 포탈은 추론을 자체 처리하지 않고 invest-app(=invest-inference) 서비스를 HTTP 호출만 한다.

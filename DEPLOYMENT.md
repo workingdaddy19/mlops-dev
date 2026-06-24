@@ -17,7 +17,7 @@
 ```bash
 cp .env.example .env
 ```
-`.env`에서 최소 아래 값을 채웁니다(필수): `SECRET_KEY`, `DB_HOST`, `DB_PASSWORD`, `JUPYTERHUB_JWT_SECRET`.
+`.env`에서 최소 아래 값을 채웁니다(필수): `APP_SECRET_KEY`, `DB_HOST`, `DB_PASSWORD`. (`JUPYTERHUB_JWT_SECRET`은 선택 — 미설정 시 Jupyter SSO만 비활성)
 S3/Athena 기능을 로컬에서 쓰려면 AWS 자격증명(`~/.aws/credentials` 또는 `AWS_*` 환경변수)이 필요합니다.
 
 ### 1-A. venv + uvicorn (Windows / macOS / Linux 공통)
@@ -78,12 +78,12 @@ git clone <repo-url> mlops-git && cd mlops-git
 # 운영
 cp k8s/backend-secret.example.yaml k8s/backend-secret.yaml
 vi k8s/backend-secret.yaml            # <...> 자리표시자를 실제 값으로 교체
-# 개발 (운영과 동일 DB(mlops) 공유 → DB_NAME=mlops, SECRET_KEY는 운영과 동일 값 사용)
+# 개발 (운영과 동일 DB(mlops) 공유 → DB_NAME=mlops, APP_SECRET_KEY는 운영과 동일 값 사용)
 cp k8s/dev/backend-secret-dev.example.yaml k8s/dev/backend-secret-dev.yaml
 vi k8s/dev/backend-secret-dev.yaml
 ```
 > deploy 스크립트가 `k8s/.../backend-secret*.yaml`을 `kubectl apply` 하므로, 위 파일이 서버에 존재해야 합니다.
-> **[중요] dev는 운영과 같은 `mlops` DB를 공유**합니다. 같은 `users` 테이블을 쓰므로 **dev `SECRET_KEY`는 반드시 운영과 동일**해야 로그인이 됩니다(비밀번호 해시가 SECRET_KEY를 salt로 사용). dev/운영이 사용자·권한·쿼리이력 데이터를 공유함에 유의하세요.
+> **[중요] dev는 운영과 같은 `mlops` DB를 공유**합니다. 같은 `users` 테이블을 쓰므로 **dev `APP_SECRET_KEY`는 반드시 운영과 동일**해야 로그인이 됩니다(비밀번호 해시가 APP_SECRET_KEY를 salt로 사용). dev/운영이 사용자·권한·쿼리이력 데이터를 공유함에 유의하세요.
 
 ### 2-2. 개발(dev) 배포 — 운영 전 검증
 ```bash
@@ -165,9 +165,18 @@ kubectl delete -f k8s/dev/ -n mlops
 
 ---
 
-## 6. 보안 참고
+## 6. 설정 · 보안 관리 방식
 
+- **설정 일원화 (k8s yaml 최소화)**: 비민감 설정(서비스 URL/리전/버킷/`JUPYTER_ENVS` 등)은
+  **앱 소스 코드 기본값**(`app/core/config.py`) + **DB(`system_settings`)** 에서 관리하며,
+  **관리자 → Management → Settings** 화면에서 재배포 없이 수정합니다(저장 즉시 반영).
+  → k8s `backend-secret.yaml` 에는 더 이상 이런 설정을 두지 않습니다.
+- **k8s Secret = 순수 자격증명 8개뿐**:
+  `DB_HOST/PORT/NAME/USER/DB_PASSWORD`(DB 접속 — DB에 담을 수 없음), `APP_SECRET_KEY`(마스터 키),
+  `JUPYTERHUB_ADMIN_TOKEN`·`JUPYTERHUB_JWT_SECRET`(민감).
+  비밀이 아닌 `AWS_REGION`/`AWS_DEFAULT_REGION`은 **Deployment의 일반 env**로 분리(Secret 아님).
+  → **인프라팀 요청용 정리 문서: [`k8s/SECRET-SETUP.md`](k8s/SECRET-SETUP.md)**
 - **공개 저장소 안전 처리**: 실제 비밀값이 담긴 `k8s/backend-secret.yaml`, `k8s/dev/backend-secret-dev.yaml`, `.env` 는 `.gitignore`로 **커밋 제외**됩니다. 저장소에는 자리표시자만 담긴 `*.example.yaml` / `.env.example` 템플릿만 올라갑니다.
 - 서버에서는 §2-1.5처럼 템플릿을 복사해 실제 값을 채워 사용하세요.
 - 더 안전하게 운영하려면 **SealedSecrets / AWS Secrets Manager(External Secrets)** 도입을 권장합니다.
-- dev는 운영과 **동일한 `mlops` DB를 공유**합니다(`DB_NAME=mlops`). 같은 `users` 테이블을 쓰므로 dev `SECRET_KEY`는 **운영과 동일 값**이어야 로그인이 정상 동작합니다. dev/운영이 사용자·권한·쿼리이력 데이터를 공유하므로, dev 테스트가 운영 데이터에 영향을 줄 수 있음에 유의하세요.
+- dev는 운영과 **동일한 `mlops` DB를 공유**합니다(`DB_NAME=mlops`). 같은 `users` 테이블을 쓰므로 dev `APP_SECRET_KEY`는 **운영과 동일 값**이어야 로그인이 정상 동작합니다. dev/운영이 사용자·권한·쿼리이력 데이터를 공유하므로, dev 테스트가 운영 데이터에 영향을 줄 수 있음에 유의하세요.

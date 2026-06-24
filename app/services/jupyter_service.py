@@ -107,15 +107,20 @@ class JupyterService:
             "exp": int((now + timedelta(minutes=15)).timestamp()),
         }
         
-        try:
-            sso_jwt = jwt.encode(payload, self.jwt_secret, algorithm="HS256")
-            # jwtauthenticator는 next URL 안의 token 파라미터를 검증함
-            # /hub/login?next=/user/{username}/lab?token={jwt} 구조가 정상 동작
-            next_with_token = quote(f"{lab_path}?token={sso_jwt}", safe="")
-            lab_url = f"{self.base_url}/hub/login?next={next_with_token}"
-        except Exception as e:
-            logger.error("Failed to generate JWT: %s", e)
+        if not self.jwt_secret:
+            # JWT 시크릿 미설정 시 빈 키 서명을 피하고, 토큰 없이 직접 접속 URL 반환
+            logger.warning("JUPYTERHUB_JWT_SECRET 미설정 — SSO 토큰 생략, 직접 접속 URL 반환")
             lab_url = f"{self.base_url}{lab_path}"
+        else:
+            try:
+                sso_jwt = jwt.encode(payload, self.jwt_secret, algorithm="HS256")
+                # jwtauthenticator는 next URL 안의 token 파라미터를 검증함
+                # /hub/login?next=/user/{username}/lab?token={jwt} 구조가 정상 동작
+                next_with_token = quote(f"{lab_path}?token={sso_jwt}", safe="")
+                lab_url = f"{self.base_url}/hub/login?next={next_with_token}"
+            except Exception as e:
+                logger.error("Failed to generate JWT: %s", e)
+                lab_url = f"{self.base_url}{lab_path}"
 
         return {
             "url":          lab_url,

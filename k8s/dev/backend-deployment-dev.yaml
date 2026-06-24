@@ -31,6 +31,12 @@ spec:
           envFrom:
             - secretRef:
                 name: backend-secret-dev
+          # 비민감 설정은 코드 기본값 + DB(system_settings)에서 관리. AWS 리전만 일반 env.
+          env:
+            - name: AWS_REGION
+              value: "ap-northeast-2"
+            - name: AWS_DEFAULT_REGION
+              value: "ap-northeast-2"
           livenessProbe:
             httpGet:
               path: /health
