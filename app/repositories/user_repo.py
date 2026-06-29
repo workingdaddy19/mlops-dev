@@ -1,5 +1,6 @@
 from datetime import date, timedelta
 
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.models.user import User
@@ -27,6 +28,17 @@ class UserRepository:
         if dt_to:
             q = q.filter(User.created_at < dt_to + timedelta(days=1))
         return q.order_by(User.id).all()
+
+    def search(self, q: str, limit: int = 20) -> list[User]:
+        """멤버 선택용 — 사번/성명 부분일치(OR). 최소 필드만 노출용."""
+        like = f"%{q}%"
+        return (
+            self.session.query(User)
+            .filter(or_(User.username.ilike(like), User.name.ilike(like)))
+            .order_by(User.id)
+            .limit(limit)
+            .all()
+        )
 
     def create(self, user: User) -> User:
         self.session.add(user)

@@ -7,6 +7,7 @@ from app.models.resource import (
     AnalysisProject,
     CapacityEstimate,
     ResourceLedger,
+    is_project_member_of,
 )
 
 
@@ -32,8 +33,12 @@ class ResourceRepository:
 
     def list_projects_for_user(self, username: str, name: str | None = None,
                                dt_from: date | None = None, dt_to: date | None = None) -> list[AnalysisProject]:
-        """본인 과제 — owner/created_by 정확매칭 + members 텍스트 LIKE(MVP)."""
-        conds = [AnalysisProject.owner == username, AnalysisProject.created_by == username]
+        """본인/참여 과제 — owner/created_by 정확 + members에 사번(username) 토큰 정확 일치(+레거시 이름 폴백)."""
+        conds = [
+            AnalysisProject.owner == username,
+            AnalysisProject.created_by == username,
+            and_(AnalysisProject.members.isnot(None), AnalysisProject.members.ilike(f"%{username}%")),
+        ]
         if name:
             conds.append(AnalysisProject.owner == name)
             conds.append(and_(AnalysisProject.members.isnot(None), AnalysisProject.members.ilike(f"%{name}%")))
@@ -42,7 +47,9 @@ class ResourceRepository:
             q = q.filter(AnalysisProject.created_at >= dt_from)
         if dt_to:
             q = q.filter(AnalysisProject.created_at < dt_to + timedelta(days=1))
-        return q.order_by(AnalysisProject.id.desc()).all()
+        rows = q.order_by(AnalysisProject.id.desc()).all()
+        # members LIKE는 부분문자열 오매칭 가능 → 토큰 정밀 필터
+        return [p for p in rows if is_project_member_of(p, username, name)]
 
     def get_project(self, project_id: int) -> AnalysisProject | None:
         return (

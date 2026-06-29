@@ -19,6 +19,7 @@ from app.models.resource import (
     ResourceLedger,
 )
 from app.repositories.resource_repo import ResourceRepository
+from app.repositories.user_repo import UserRepository
 from app.schemas.auth import UserRead
 from app.schemas.resource import (
     AnalysisProjectCreate,
@@ -79,6 +80,20 @@ def list_my_projects(
     """본인 참여 과제 (모든 사용자). 기간 필터(created_at)."""
     projects = ResourceService(db).list_my_projects(current_user, parse_date(date_from), parse_date(date_to))
     return [AnalysisProjectRead.model_validate(p) for p in projects]
+
+
+@router.get("/users/lookup")
+def lookup_users(
+    q: str = "",
+    db: Session = Depends(get_db),
+    _: UserRead = Depends(get_current_user),
+):
+    """멤버 선택용 사용자 검색(인증 필요, 비-admin 허용). 사번/성명 부분일치·상한 20·최소 필드."""
+    q = (q or "").strip()
+    if len(q) < 1:
+        return []
+    users = UserRepository(db).search(q, limit=20)
+    return [{"username": u.username, "name": u.name, "department": u.department} for u in users]
 
 
 @router.post("/projects", response_model=AnalysisProjectRead, status_code=201)

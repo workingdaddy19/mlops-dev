@@ -44,13 +44,11 @@ def require_admin(current_user: UserRead = Depends(get_current_user)) -> UserRea
 
 
 def _is_project_member(project, user: UserRead) -> bool:
-    """과제 소유/참여 판정 — admin은 항상 허용. MVP 텍스트 매칭."""
+    """과제 소유/참여 판정 — admin은 항상 허용. 사번 토큰 정확 일치 + 레거시 이름 폴백."""
     if user.role == "admin":
         return True
-    name = (user.name or "").strip()
-    if project.owner in (user.username, name) or project.created_by == user.username:
-        return True
-    return bool(name and project.members and name in project.members)
+    from app.models.resource import is_project_member_of
+    return is_project_member_of(project, user.username, user.name)
 
 
 def get_owned_project(

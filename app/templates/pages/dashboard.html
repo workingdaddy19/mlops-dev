@@ -2,9 +2,7 @@
 
 {% block title %}대시보드 - AI 데이터 분석{% endblock %}
 
-{% block breadcrumb %}
-  <span class="current">Home</span>
-{% endblock %}
+{% block breadcrumb %}{% endblock %}
 
 {% block content %}
 
@@ -19,9 +17,17 @@
   </ul>
 </div>
 
-<!-- ═══ 중간: 핵심 사용 현황 ═════════════════════════════════════ -->
-<div class="dash-section-title">핵심 사용 현황</div>
-<div class="stat-grid">
+<!-- ═══ 사용자: 내 보유 권한 (컴팩트) ════════════════════════════ -->
+<div class="card" id="perm-card" style="margin-top:8px; display:none; padding:11px 16px;">
+  <div style="display:flex; align-items:center; gap:14px; flex-wrap:wrap;">
+    <span style="font-size:13px; font-weight:700; color:var(--text-muted); white-space:nowrap;">내 보유 권한</span>
+    <span id="perm-chips" style="display:flex; gap:16px; flex-wrap:wrap; font-size:13px;">확인 중...</span>
+  </div>
+</div>
+
+<!-- ═══ 중간: 핵심 사용 현황 (admin) ═════════════════════════════ -->
+<div class="dash-section-title" id="core-usage-title">핵심 사용 현황</div>
+<div class="stat-grid" id="stat-grid">
   <a href="/admin/users" class="stat-card">
     <div class="stat-icon">👥</div>
     <div class="stat-body">
@@ -41,13 +47,14 @@
     <div class="stat-badge" id="badge-jupyter">⏳</div>
   </a>
 
-  <a href="/aiml/experiments" class="stat-card">
-    <div class="stat-icon">📈</div>
+  <a href="/admin/permission-requests" class="stat-card">
+    <div class="stat-icon">🔑</div>
     <div class="stat-body">
-      <div class="stat-label">모델 실험 · 배포</div>
-      <div class="stat-value" id="val-model">Experiments</div>
-      <div class="stat-sub">실험·모델 레지스트리 바로가기 →</div>
+      <div class="stat-label">권한 신청 관리</div>
+      <div class="stat-value" id="val-permreq">—</div>
+      <div class="stat-sub" id="sub-permreq">대기 신청 검토 →</div>
     </div>
+    <div class="stat-badge" id="badge-permreq"></div>
   </a>
 
   <!-- 분석 자원 (admin only — JS로 표시) -->
@@ -124,7 +131,8 @@
     <div class="card-title" style="margin:0;">📋 ITSM 권한 신청 작성 예시</div>
     <span style="font-size:12px; color:var(--primary); font-weight:600;">클릭하여 복사 📋</span>
   </div>
-  <pre id="itsm-text" style="margin:0; font-size:13px; line-height:1.7; background:var(--bg-sidebar); border:1px solid var(--border); border-radius:6px; padding:12px 14px; white-space:pre-wrap; color:var(--text-primary);">1) 사유 : XXXX 분석과제 진행
+  <pre id="itsm-text" style="margin:0; font-size:13px; line-height:1.7; background:var(--bg-sidebar); border:1px solid var(--border); border-radius:6px; padding:12px 14px; white-space:pre-wrap; color:var(--text-primary);">ITSM 제목 : [AIA] AI 데이터 분석 권한 신청
+1) 사유 : XXXX 분석과제 진행
 2) 권한 신청 : 저장소 (S3), 데이터조회(Athena), 분석기(Jupyter)
 3) 기간 : 2026.06.27~2026.09.30 (3개월 3일)
 4) 기타 : 자원 필요사항 엔지니어 협의 후 인프라팀 전달 예정</pre>
@@ -200,6 +208,8 @@
 </style>
 
 <script>
+const PERM_LABEL = { s3:'🗄️ 저장소 (S3)', athena:'📊 데이터조회(Athena)', jupyter:'📓 분석기(Jupyter)' };
+
 document.addEventListener('DOMContentLoaded', () => {
   const user = Auth.getUser();
   const isAdmin = user && user.role === 'admin';
@@ -209,15 +219,46 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('resource-card').style.display = '';  // 분석 자원 현황
     document.getElementById('flow-card').style.display = 'none';   // 흐름 가이드는 사용자용
     document.getElementById('itsm-example-card').style.display = 'none';  // ITSM 예시는 사용자용
+  } else {
+    // 사용자: '핵심 사용 현황' 제거 + '내 보유 권한' 표시
+    document.getElementById('core-usage-title').style.display = 'none';
+    document.getElementById('stat-grid').style.display = 'none';
+    document.getElementById('perm-card').style.display = '';
   }
   Promise.allSettled([
     loadNotices(),
-    loadUsers(),
-    loadJupyter(),
+    isAdmin ? loadUsers() : Promise.resolve(),
+    isAdmin ? loadJupyter() : Promise.resolve(),
     isAdmin ? loadResource() : Promise.resolve(),
     isAdmin ? loadResourceSummary() : Promise.resolve(),
+    isAdmin ? loadPendingPerms() : loadMyPerms(),
   ]);
 });
+
+// ── 내 보유 권한 (사용자) ──────────────────────────────
+async function loadMyPerms() {
+  const el = document.getElementById('perm-chips');
+  try {
+    const res = await apiFetch('/api/auth/me/permissions');
+    const perms = (res && res.ok) ? await res.json() : [];
+    el.innerHTML = Object.keys(PERM_LABEL).map(k => {
+      const has = perms.includes(k);
+      return `<span>${PERM_LABEL[k]} ${has ? '<b style="color:#10b981;">✓ 보유</b>' : '<span style="color:#94a3b8;">미보유</span>'}</span>`;
+    }).join('');
+  } catch { el.textContent = '권한 정보를 불러오지 못했습니다.'; }
+}
+
+// ── 권한 신청 관리 (admin) ─────────────────────────────
+async function loadPendingPerms() {
+  try {
+    const res = await apiFetch('/api/admin/permission-requests?status=pending');
+    if (!res || !res.ok) return;
+    const list = await res.json();
+    document.getElementById('val-permreq').textContent = `${list.length}건`;
+    document.getElementById('sub-permreq').textContent = list.length ? '대기 신청 검토 →' : '대기 없음';
+    setBadge('badge-permreq', list.length === 0);
+  } catch {}
+}
 
 // ── 분석 자원 현황 (admin) ──────────────────────────────
 async function loadResourceSummary() {

@@ -398,6 +398,19 @@ body.sidebar-collapsed .sidebar-divider { margin: 6px 14px; }
 .filter-bar input, .filter-bar select { padding:4px 8px; font-size:13px; width:140px; }
 .list-pager { display:flex; justify-content:center; align-items:center; gap:6px; margin-top:12px; }
 
+/* ── 멤버(사용자) 다중 선택 피커 ─── */
+.member-picker { position:relative; }
+.member-picker .mp-chips { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:6px; }
+.member-picker .mp-chip { display:inline-flex; align-items:center; gap:4px; background:#e0f2fe; color:#075985; border-radius:99px; padding:2px 8px; font-size:12px; }
+.member-picker .mp-chip small { color:#0369a1; }
+.member-picker .mp-chip a { cursor:pointer; color:#0369a1; font-weight:700; text-decoration:none; }
+.member-picker .mp-input { width:100%; }
+.member-picker .mp-dd { position:absolute; left:0; right:0; z-index:50; background:#fff; border:1px solid var(--border); border-radius:8px; margin-top:2px; max-height:220px; overflow-y:auto; box-shadow:0 6px 20px rgba(0,0,0,.10); }
+.member-picker .mp-opt { padding:7px 12px; font-size:13px; cursor:pointer; }
+.member-picker .mp-opt:hover { background:var(--bg-secondary,#f1f5f9); }
+.member-picker .mp-opt small { color:var(--text-muted); }
+.member-picker .mp-empty { color:var(--text-muted); cursor:default; }
+
 /* ── Rail Tooltip (JS 위치 지정) ──────────────── */
 .rail-tooltip {
   position: fixed;

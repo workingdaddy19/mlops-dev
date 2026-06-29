@@ -211,8 +211,9 @@
       </div>
     </div>
     <div class="form-group">
-      <label class="form-label">분석가 명단</label>
-      <input id="ep-members" class="form-input">
+      <label class="form-label">분석가(공동작업자) 선택</label>
+      <div id="ep-members-picker"></div>
+      <p style="font-size:11px; color:var(--text-muted); margin:4px 0 0;">선택 사용자에게 과제가 '내 분석 과제'에 보이고 자원 신청에 참여 가능. (추가/삭제 즉시 반영)</p>
     </div>
     <div class="form-group">
       <label class="form-label">분석 데이터 종류</label>
@@ -404,6 +405,7 @@
   }
 
   // ── 과제 수정 모달 ─────────────────────────────────────────────
+  let editMemberPicker;
   function openEditProjectModal() {
     if (!_projData) return;
     const p = _projData;
@@ -412,7 +414,8 @@
     document.getElementById('ep-member-count').value = p.member_count || 1;
     document.getElementById('ep-start').value = p.period_start || '';
     document.getElementById('ep-end').value = p.period_end || '';
-    document.getElementById('ep-members').value = p.members || '';
+    if (!editMemberPicker) editMemberPicker = makeMemberPicker(document.getElementById('ep-members-picker'));
+    editMemberPicker.setCsv(p.members || '');
     document.getElementById('ep-data-types').value = p.data_types || '';
     document.getElementById('ep-datasets').value = p.datasets || '';
     document.getElementById('ep-sec-status').value = p.security_review_status || 'none';
@@ -436,7 +439,7 @@
       period_start: document.getElementById('ep-start').value || null,
       period_end: document.getElementById('ep-end').value || null,
       member_count: parseInt(document.getElementById('ep-member-count').value || '1', 10),
-      members: document.getElementById('ep-members').value.trim() || null,
+      members: (editMemberPicker ? editMemberPicker.getCsv() : '') || null,
       data_types: document.getElementById('ep-data-types').value.trim() || null,
       datasets: document.getElementById('ep-datasets').value.trim() || null,
       security_review_status: document.getElementById('ep-sec-status').value,

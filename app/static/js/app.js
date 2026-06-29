@@ -78,6 +78,56 @@ function makePager(pageSize, renderFn, pagerElId) {
   }
   return { set(newItems) { items = newItems || []; page = 1; render(); } };
 }
+
+// ─── 멤버(사용자) 다중 선택 피커 — 사번/성명 검색 → 칩 ──────────────────────
+function makeMemberPicker(root) {
+  if (!root) return { getCsv: () => '', count: () => 0, setCsv() {}, clear() {} };
+  const esc = (s) => s == null ? '' : String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  root.classList.add('member-picker');
+  root.innerHTML =
+    '<div class="mp-chips"></div>'
+    + '<input class="mp-input form-input" placeholder="사번/성명 검색하여 추가" autocomplete="new-password">'
+    + '<div class="mp-dd" style="display:none;"></div>';
+  const chipsEl = root.querySelector('.mp-chips');
+  const input = root.querySelector('.mp-input');
+  const dd = root.querySelector('.mp-dd');
+  let selected = [];   // {username, name}
+  let timer;
+
+  function renderChips() {
+    chipsEl.innerHTML = selected.map((m, i) => {
+      const showName = m.name && m.name !== m.username;
+      return `<span class="mp-chip">${esc(m.name || m.username)}${showName ? ` <small>(${esc(m.username)})</small>` : ''} <a data-i="${i}" title="제거">×</a></span>`;
+    }).join('');
+    chipsEl.querySelectorAll('a[data-i]').forEach(a => a.onclick = () => { selected.splice(+a.dataset.i, 1); renderChips(); });
+  }
+  function add(m) {
+    if (m.username && !selected.some(x => x.username === m.username)) { selected.push(m); renderChips(); }
+    input.value = ''; dd.style.display = 'none';
+  }
+  input.addEventListener('input', () => {
+    clearTimeout(timer);
+    const q = input.value.trim();
+    if (q.length < 1) { dd.style.display = 'none'; return; }
+    timer = setTimeout(async () => {
+      const res = await apiFetch('/api/resource/users/lookup?q=' + encodeURIComponent(q));
+      const list = (res && res.ok) ? await res.json() : [];
+      if (!list.length) { dd.innerHTML = '<div class="mp-opt mp-empty">검색 결과 없음</div>'; dd.style.display = 'block'; return; }
+      dd.innerHTML = list.map(u =>
+        `<div class="mp-opt" data-u="${esc(u.username)}" data-n="${esc(u.name || '')}">${esc(u.name || u.username)} <small>${esc(u.username)}${u.department ? ' · ' + esc(u.department) : ''}</small></div>`).join('');
+      dd.style.display = 'block';
+      dd.querySelectorAll('.mp-opt[data-u]').forEach(o => o.onclick = () => add({ username: o.dataset.u, name: o.dataset.n || o.dataset.u }));
+    }, 250);
+  });
+  document.addEventListener('click', e => { if (!root.contains(e.target)) dd.style.display = 'none'; });
+
+  return {
+    getCsv: () => selected.map(m => m.username).join(','),
+    count: () => selected.length,
+    setCsv: (csv) => { selected = (csv || '').split(',').map(s => s.trim()).filter(Boolean).map(u => ({ username: u, name: u })); renderChips(); },
+    clear: () => { selected = []; renderChips(); input.value = ''; dd.style.display = 'none'; },
+  };
+}
 function dateRangeParams(fromId, toId, params) {
   const f = document.getElementById(fromId);
   const t = document.getElementById(toId);

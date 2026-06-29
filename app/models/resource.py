@@ -27,6 +27,23 @@ LEDGER_TRANSITIONS: dict[str, tuple[str, ...]] = {
 RECLAIM_REASONS = ("expired", "idle", "event")  # 정기(만료) / 유휴 / 이벤트(과제중단·담당자변경)
 
 
+def project_member_tokens(members: str | None) -> list[str]:
+    """members 텍스트(사번 CSV, 구분자 , 또는 ;) → 토큰 리스트."""
+    if not members:
+        return []
+    return [t.strip() for t in members.replace(";", ",").split(",") if t.strip()]
+
+
+def is_project_member_of(project, username: str, name: str | None) -> bool:
+    """과제 소유/참여 판정(비-admin 기준). 사번 토큰 정확 일치 + 레거시 이름 부분포함 폴백."""
+    name = (name or "").strip()
+    if project.owner in (username, name) or project.created_by == username:
+        return True
+    if username in project_member_tokens(project.members):
+        return True
+    return bool(name and project.members and name in project.members)  # 레거시 자유텍스트
+
+
 class AnalysisProject(Base):
     """분석 과제 — 등록 산출물 = '과제 정의서'."""
 

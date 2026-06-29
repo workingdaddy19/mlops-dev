@@ -87,8 +87,9 @@
       </div>
     </div>
     <div class="form-group">
-      <label class="form-label">분석가 명단</label>
-      <input id="f-members" class="form-input" placeholder="예: 김분석, 이데이터, 박모델" autocomplete="new-password">
+      <label class="form-label">분석가(공동작업자) 선택</label>
+      <div id="f-members-picker"></div>
+      <p style="font-size:11px; color:var(--text-muted); margin:4px 0 0;">선택한 사용자에게 이 과제가 '내 분석 과제'에 보이고 자원 신청에 참여할 수 있습니다.</p>
     </div>
     <div class="form-group">
       <label class="form-label">분석 데이터 종류</label>
@@ -241,10 +242,13 @@ function renderProjectRows(items) {
 }
 
 // ── 과제 등록 ──────────────────────────────────────────────────────────────
+let memberPicker;
 function openCreateModal() {
-  ['f-name','f-owner','f-code','f-start','f-end','f-members','f-data-types','f-datasets','f-sec-date','f-itsm','f-purpose'].forEach(id => document.getElementById(id).value = '');
+  ['f-name','f-owner','f-code','f-start','f-end','f-data-types','f-datasets','f-sec-date','f-itsm','f-purpose'].forEach(id => document.getElementById(id).value = '');
   document.getElementById('f-member-count').value = '1';
   document.getElementById('f-sec-status').value = 'none';
+  if (!memberPicker) memberPicker = makeMemberPicker(document.getElementById('f-members-picker'));
+  memberPicker.clear();
   document.getElementById('createModal').classList.add('open');
 }
 function closeCreateModal() { document.getElementById('createModal').classList.remove('open'); }
@@ -262,7 +266,7 @@ async function submitCreate() {
     period_start: document.getElementById('f-start').value || null,
     period_end: document.getElementById('f-end').value || null,
     member_count: parseInt(document.getElementById('f-member-count').value || '1', 10),
-    members: document.getElementById('f-members').value.trim() || null,
+    members: (memberPicker ? memberPicker.getCsv() : '') || null,
     data_types: document.getElementById('f-data-types').value.trim() || null,
     datasets: document.getElementById('f-datasets').value.trim() || null,
     security_review_status: document.getElementById('f-sec-status').value,
