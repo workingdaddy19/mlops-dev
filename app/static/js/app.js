@@ -44,6 +44,69 @@ async function logAccess() {
   } catch { /* best-effort */ }
 }
 
+// ─── 리스트 기간 조회 헬퍼 (기본 최근 1개월) ───────────────────────────────
+function _ymd(d) { return d.toISOString().slice(0, 10); }
+function fillDefaultRange(fromId, toId, opts) {
+  opts = opts || {};
+  const to = new Date();
+  const from = new Date();
+  if (opts.weeks) from.setDate(from.getDate() - 7 * opts.weeks);
+  else from.setMonth(from.getMonth() - (opts.months || 1));
+  const f = document.getElementById(fromId);
+  const t = document.getElementById(toId);
+  if (f && !f.value) f.value = _ymd(from);
+  if (t && !t.value) t.value = _ymd(to);
+}
+
+// ─── 클라이언트 페이지네이션 (페이지당 pageSize행 + 이전/다음) ──────────────
+function makePager(pageSize, renderFn, pagerElId) {
+  let items = [], page = 1;
+  const pages = () => Math.max(1, Math.ceil(items.length / pageSize));
+  function render() {
+    if (page > pages()) page = pages();
+    const start = (page - 1) * pageSize;
+    renderFn(items.slice(start, start + pageSize));
+    const el = document.getElementById(pagerElId);
+    if (!el) return;
+    if (items.length <= pageSize) { el.innerHTML = ''; return; }
+    el.innerHTML =
+      `<button class="btn btn-secondary" data-pg="prev" style="padding:3px 10px;font-size:12px;">◀ 이전</button>`
+      + `<span style="font-size:12px;color:var(--text-muted);margin:0 10px;">${start + 1}–${Math.min(start + pageSize, items.length)} / ${items.length}</span>`
+      + `<button class="btn btn-secondary" data-pg="next" style="padding:3px 10px;font-size:12px;">다음 ▶</button>`;
+    el.querySelector('[data-pg=prev]').onclick = () => { if (page > 1) { page--; render(); } };
+    el.querySelector('[data-pg=next]').onclick = () => { if (page < pages()) { page++; render(); } };
+  }
+  return { set(newItems) { items = newItems || []; page = 1; render(); } };
+}
+function dateRangeParams(fromId, toId, params) {
+  const f = document.getElementById(fromId);
+  const t = document.getElementById(toId);
+  if (f && f.value) params.set('date_from', f.value);
+  if (t && t.value) params.set('date_to', t.value);
+  return params;
+}
+
+// ─── 자원 신청/배분 공통: 산정서 한도 배너 ─────────────────────────────────
+function renderCapBanner(el, cap) {
+  if (!el) return;
+  if (!cap) { el.innerHTML = '한도 조회 실패'; el.style.background = '#fef2f2'; el.style.borderColor = '#fecaca'; return; }
+  if (!cap.has_approved_estimate) {
+    el.innerHTML = '⚠️ <b>승인된 용량 산정서가 없습니다.</b> 산정서 작성·승인 후 신청할 수 있습니다.';
+    el.style.background = '#fef3c7'; el.style.borderColor = '#fde68a';
+    return;
+  }
+  el.innerHTML = `산정서 한도 <b>${cap.peak_vcpu} vCPU / ${cap.peak_mem} GB</b> · 남은 <b style="color:#0d9488;">${cap.remain_vcpu} vCPU / ${cap.remain_mem} GB</b>`;
+  el.style.background = '#f0fdfa'; el.style.borderColor = '#99f6e4';
+}
+async function loadCapBanner(projectId, elId) {
+  const el = document.getElementById(elId);
+  if (el) el.innerHTML = '산정서 한도 확인 중...';
+  try {
+    const res = await apiFetch(`/api/resource/projects/${projectId}/capacity`);
+    renderCapBanner(el, (res && res.ok) ? await res.json() : null);
+  } catch { renderCapBanner(el, null); }
+}
+
 // ─── Sidebar toggle / 폭 ───────────────────────────────────────────────────
 function clampW(w) { return Math.max(180, Math.min(360, w)); }
 

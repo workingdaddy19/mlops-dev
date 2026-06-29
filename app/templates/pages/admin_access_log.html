@@ -10,27 +10,14 @@
 
 {% block content %}
 <div class="card">
-  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
-    <div class="card-title" style="margin-bottom:0;">🛡️ 사용자 접속 기록 (감사 로그)</div>
-    <button class="btn btn-secondary" style="padding:4px 12px; font-size:12px;" onclick="exportCsv()">⬇ CSV 내보내기</button>
-  </div>
+  <div class="card-title" style="margin-bottom:16px;">🛡️ 사용자 접속 기록 (감사 로그)</div>
 
   <!-- 필터 -->
-  <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:flex-end; margin-bottom:14px;">
-    <div>
-      <label class="form-label" style="font-size:11px;">아이디</label>
-      <input id="f-username" class="form-input" style="padding:4px 8px; font-size:13px; width:120px;" placeholder="아이디">
-    </div>
-    <div>
-      <label class="form-label" style="font-size:11px;">부서</label>
-      <input id="f-department" class="form-input" style="padding:4px 8px; font-size:13px; width:120px;" placeholder="부서">
-    </div>
-    <div>
-      <label class="form-label" style="font-size:11px;">메뉴</label>
-      <input id="f-menu" class="form-input" style="padding:4px 8px; font-size:13px; width:140px;" placeholder="메뉴명">
-    </div>
-    <div>
-      <label class="form-label" style="font-size:11px;">동작</label>
+  <div class="filter-bar">
+    <div class="fb-field"><label>사번</label><input id="f-username" class="form-input" style="width:120px;" placeholder="사번" autocomplete="new-password"></div>
+    <div class="fb-field"><label>부서</label><input id="f-department" class="form-input" style="width:120px;" placeholder="부서" autocomplete="new-password"></div>
+    <div class="fb-field"><label>메뉴</label><input id="f-menu" class="form-input" style="width:140px;" placeholder="메뉴명" autocomplete="new-password"></div>
+    <div class="fb-field"><label>동작</label>
       <select id="f-action" class="form-select" style="padding:4px 8px; font-size:13px;">
         <option value="">전체</option>
         <option value="view">메뉴 접속</option>
@@ -39,14 +26,8 @@
         <option value="logout">로그아웃</option>
       </select>
     </div>
-    <div>
-      <label class="form-label" style="font-size:11px;">시작일</label>
-      <input id="f-from" type="date" class="form-input" style="padding:4px 8px; font-size:13px;">
-    </div>
-    <div>
-      <label class="form-label" style="font-size:11px;">종료일</label>
-      <input id="f-to" type="date" class="form-input" style="padding:4px 8px; font-size:13px;">
-    </div>
+    <div class="fb-field"><label>시작일</label><input id="f-from" type="date" class="form-input" autocomplete="new-password"></div>
+    <div class="fb-field"><label>종료일</label><input id="f-to" type="date" class="form-input" autocomplete="new-password"></div>
     <button class="btn btn-primary" style="padding:5px 14px; font-size:13px;" onclick="search()">🔍 조회</button>
     <button class="btn btn-secondary" style="padding:5px 14px; font-size:13px;" onclick="resetFilters()">초기화</button>
   </div>
@@ -58,7 +39,7 @@
       <thead>
         <tr>
           <th style="width:160px;">시각</th>
-          <th style="width:110px;">아이디</th>
+          <th style="width:110px;">사번</th>
           <th style="width:110px;">성명</th>
           <th style="width:120px;">부서</th>
           <th style="width:130px;">접속 IP</th>
@@ -83,7 +64,7 @@
 
 {% block scripts %}
 <script>
-const LIMIT = 100;
+const LIMIT = 10;
 let offset = 0;
 let total = 0;
 
@@ -94,7 +75,7 @@ const ACTION_STYLE = {
   logout:     { text: '로그아웃', bg: '#f1f5f9', fg: '#475569' },
 };
 
-document.addEventListener('DOMContentLoaded', () => { search(); });
+document.addEventListener('DOMContentLoaded', () => { fillDefaultRange('f-from', 'f-to'); search(); });
 
 function buildQuery(extra = {}) {
   const params = new URLSearchParams();
@@ -170,23 +151,6 @@ function updatePageInfo() {
   const start = total === 0 ? 0 : offset + 1;
   const end = Math.min(offset + LIMIT, total);
   document.getElementById('page-info').textContent = `${start.toLocaleString()} – ${end.toLocaleString()} / ${total.toLocaleString()}`;
-}
-
-function exportCsv() {
-  const qs = buildQuery();
-  const token = Auth.getToken();
-  // fetch + blob (Authorization 헤더 필요)
-  fetch('/api/admin/access-logs/export?' + qs, { headers: { Authorization: `Bearer ${token}` } })
-    .then(res => { if (!res.ok) throw new Error('export failed'); return res.blob(); })
-    .then(blob => {
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'access_logs.csv';
-      document.body.appendChild(a); a.click(); a.remove();
-      URL.revokeObjectURL(url);
-    })
-    .catch(() => showToast('CSV 내보내기 실패', 'error'));
 }
 
 function fmtTime(s) {

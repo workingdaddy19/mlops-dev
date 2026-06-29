@@ -11,6 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.api.deps import _is_project_member, get_current_user, get_db, get_owned_project, require_admin
+from app.core.dateutil import parse_date
 from app.models.resource import (
     LEDGER_STATUSES,
     PROJECT_STATUSES,
@@ -53,19 +54,30 @@ def _assert_owns(db: Session, project_id: int, user: UserRead):
 @router.get("/projects", response_model=list[AnalysisProjectRead])
 def list_projects(
     status: str | None = Query(default=None),
+    name: str | None = None,
+    owner: str | None = None,
+    date_from: str | None = None,
+    date_to: str | None = None,
     db: Session = Depends(get_db),
     _: UserRead = Depends(require_admin),
 ):
-    """전체 과제 (admin)."""
+    """전체 과제 (admin). 과제명·담당자·기간 필터."""
     if status and status not in PROJECT_STATUSES:
         raise HTTPException(status_code=400, detail=f"유효하지 않은 상태: {status}")
-    return [AnalysisProjectRead.model_validate(p) for p in ResourceRepository(db).list_projects(status)]
+    projects = ResourceRepository(db).list_projects(
+        status, name or None, owner or None, parse_date(date_from), parse_date(date_to))
+    return [AnalysisProjectRead.model_validate(p) for p in projects]
 
 
 @router.get("/projects/mine", response_model=list[AnalysisProjectRead])
-def list_my_projects(db: Session = Depends(get_db), current_user: UserRead = Depends(get_current_user)):
-    """본인 참여 과제 (모든 사용자)."""
-    projects = ResourceService(db).list_my_projects(current_user)
+def list_my_projects(
+    date_from: str | None = None,
+    date_to: str | None = None,
+    db: Session = Depends(get_db),
+    current_user: UserRead = Depends(get_current_user),
+):
+    """본인 참여 과제 (모든 사용자). 기간 필터(created_at)."""
+    projects = ResourceService(db).list_my_projects(current_user, parse_date(date_from), parse_date(date_to))
     return [AnalysisProjectRead.model_validate(p) for p in projects]
 
 
@@ -140,6 +152,8 @@ def delete_project(project_id: int, db: Session = Depends(get_db), _: UserRead =
     project = repo.get_project(project_id)
     if not project:
         raise HTTPException(status_code=404, detail="과제를 찾을 수 없습니다.")
+    if project.status != "planning":
+        raise HTTPException(status_code=400, detail="계획(planning) 상태의 과제만 삭제할 수 있습니다.")
     repo.delete_project(project)
 
 
@@ -155,6 +169,15 @@ def create_estimate(
     estimate = svc.build_estimate(project.id, body)
     created = svc.repo.create_estimate(estimate)
     return CapacityEstimateRead.model_validate(created)
+
+
+def _check_no_active_ledgers(repo: ResourceRepository, project_id: int):
+    proj = repo.get_project(project_id)
+    if not proj:
+        return
+    active = [l for l in proj.ledgers if l.status in ("submitted", "approved", "active")]
+    if active:
+        raise HTTPException(status_code=400, detail="제출/승인/활성 중인 자원 배분이 있어 산정서를 변경하거나 삭제할 수 없습니다.")
 
 
 @router.post("/estimates/{estimate_id}/approve", response_model=CapacityEstimateRead)
@@ -178,7 +201,43 @@ def delete_estimate(estimate_id: int, db: Session = Depends(get_db), current_use
         _assert_owns(db, est.project_id, current_user)
         if est.status == "approved":
             raise HTTPException(status_code=403, detail="승인된 산정서는 삭제할 수 없습니다.")
+    _check_no_active_ledgers(repo, est.project_id)
     repo.delete_estimate(est)
+
+
+@router.put("/estimates/{estimate_id}", response_model=CapacityEstimateRead)
+def update_estimate(
+    estimate_id: int, body: CapacityEstimateCreate,
+    db: Session = Depends(get_db), current_user: UserRead = Depends(get_current_user)
+):
+    svc = ResourceService(db)
+    est = svc.repo.get_estimate(estimate_id)
+    if not est:
+        raise HTTPException(status_code=404, detail="산정서를 찾을 수 없습니다.")
+    if current_user.role != "admin":
+        _assert_owns(db, est.project_id, current_user)
+        if est.status == "approved":
+            raise HTTPException(status_code=403, detail="승인된 산정서는 수정할 수 없습니다.")
+    
+    _check_no_active_ledgers(svc.repo, est.project_id)
+    
+    new_est = svc.build_estimate(est.project_id, body)
+    
+    est.dataset_summary = new_est.dataset_summary
+    est.recommended_node = new_est.recommended_node
+    est.basis_note = new_est.basis_note
+    est.estimated_by = new_est.estimated_by
+    est.derived_peak_memory_gb = new_est.derived_peak_memory_gb
+    est.derived_peak_vcpu = new_est.derived_peak_vcpu
+    
+    for step in list(est.steps):
+        db.delete(step)
+    for step in new_est.steps:
+        est.steps.append(step)
+        
+    svc.repo.save()
+    db.refresh(est)
+    return CapacityEstimateRead.model_validate(est)
 
 
 # ═══════════════════════════════════════════ 사용자 자원 신청 ═══════════════
@@ -197,6 +256,11 @@ def create_resource_request(
         raise HTTPException(status_code=400, detail="유효하지 않은 자원 프로파일입니다.")
     if body.period_start > body.period_end:
         raise HTTPException(status_code=400, detail="시작일이 종료일보다 늦을 수 없습니다.")
+    # FR-6: 신청 시점 산정서 한도 검증
+    try:
+        svc.assert_request_capacity(project.id, prof.vcpu, prof.mem_gb)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
     ledger = ResourceLedger(
         project_id=project.id, status="submitted",
         jupyter_server_type=body.profile_server or None,
@@ -218,11 +282,16 @@ def create_ledger(
     db: Session = Depends(get_db),
     current_user: UserRead = Depends(get_current_user),
 ):
-    """자원 대장 등록 — 본인 과제면 사용자도 가능(draft). 비-admin은 대상자 미지정 시 본인."""
+    """자원 대장 직접 등록(수동 수치) — admin 전용. 사용자는 'resource-request'(간편 신청) 사용."""
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="자원 배분 직접 등록은 관리자만 가능합니다. 사용자는 '자원 신청'을 이용하세요.")
     svc = ResourceService(db)
     data = body.model_dump()
-    if current_user.role != "admin" and not data.get("assigned_to"):
-        data["assigned_to"] = current_user.username
+    # FR-6: 등록 시점 산정서 한도 검증
+    try:
+        svc.assert_request_capacity(project.id, data.get("alloc_vcpu"), data.get("alloc_mem_gb"))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
     ledger = ResourceLedger(project_id=project.id, status="draft", recorded_by=current_user.username, **data)
     created = svc.repo.create_ledger(ledger)
     return svc.to_ledger_read(created)
@@ -241,7 +310,26 @@ def update_ledger(
         _assert_owns(db, ledger.project_id, current_user)
         if ledger.status not in ("draft", "submitted"):
             raise HTTPException(status_code=403, detail="승인 단계 이후에는 수정할 수 없습니다.")
-    for field, value in body.model_dump(exclude_unset=True).items():
+    data = body.model_dump(exclude_unset=True)
+
+    if "alloc_vcpu" in data or "alloc_mem_gb" in data:
+        new_vcpu = data.get("alloc_vcpu", ledger.alloc_vcpu)
+        new_mem = data.get("alloc_mem_gb", ledger.alloc_mem_gb)
+        cap = svc.remaining_capacity(ledger.project_id)
+        if cap["has_approved_estimate"]:
+            used_v = cap["used_vcpu"]
+            used_m = cap["used_mem"]
+            if ledger.status in ("approved", "active"):
+                used_v -= (ledger.alloc_vcpu or 0)
+                used_m -= (ledger.alloc_mem_gb or 0)
+            remain_v = cap["peak_vcpu"] - used_v
+            remain_m = cap["peak_mem"] - used_m
+            if new_vcpu is not None and cap["peak_vcpu"] and new_vcpu > remain_v + 1e-9:
+                raise HTTPException(status_code=400, detail=f"vCPU 한도 초과 — 남은 {round(remain_v, 2)} vCPU (요청 {new_vcpu})")
+            if new_mem is not None and cap["peak_mem"] and new_mem > remain_m + 1e-9:
+                raise HTTPException(status_code=400, detail=f"메모리 한도 초과 — 남은 {round(remain_m, 2)} GB (요청 {new_mem})")
+
+    for field, value in data.items():
         setattr(ledger, field, value)
     svc.repo.save()
     db.refresh(ledger)
@@ -308,9 +396,23 @@ def my_allocations(db: Session = Depends(get_db), current_user: UserRead = Depen
 
 
 @router.get("/my-ledgers")
-def my_ledgers(db: Session = Depends(get_db), current_user: UserRead = Depends(get_current_user)):
-    """본인 과제들의 전체 자원 대장(라이프사이클) — 권한 신청 화면 등에서 표시."""
-    return ResourceService(db).my_ledgers(current_user)
+def my_ledgers(
+    date_from: str | None = None,
+    date_to: str | None = None,
+    db: Session = Depends(get_db),
+    current_user: UserRead = Depends(get_current_user),
+):
+    """본인 과제들의 전체 자원 대장(라이프사이클). 기간 필터(created_at)."""
+    return ResourceService(db).my_ledgers(current_user, parse_date(date_from), parse_date(date_to))
+
+
+@router.get("/projects/{project_id}/capacity")
+def project_capacity(
+    project: AnalysisProject = Depends(get_owned_project),
+    db: Session = Depends(get_db),
+):
+    """승인된 산정서 한도 + 잔여 용량 (폼 표시·검증용, 본인/admin)."""
+    return ResourceService(db).remaining_capacity(project.id)
 
 
 # ═══════════════════════════════════════════ Dashboard / Reclaim / 승인큐 ═══
@@ -327,6 +429,14 @@ def pending_requests(db: Session = Depends(get_db), _: UserRead = Depends(requir
 
 
 @router.get("/reclaim")
-def reclaim_view(db: Session = Depends(get_db), _: UserRead = Depends(require_admin)):
-    """자원 회수 현황 (회수대기/회수완료) — 금융권 비용·자원 통제 근거."""
-    return ResourceService(db).reclaim_view()
+def reclaim_view(
+    date_from: str | None = None,
+    date_to: str | None = None,
+    name: str | None = None,
+    requester: str | None = None,
+    db: Session = Depends(get_db),
+    _: UserRead = Depends(require_admin),
+):
+    """자원 회수 현황. 과제명·신청자 필터 + 회수완료 기간 필터(reclaimed_at)."""
+    return ResourceService(db).reclaim_view(
+        parse_date(date_from), parse_date(date_to), name or None, requester or None)

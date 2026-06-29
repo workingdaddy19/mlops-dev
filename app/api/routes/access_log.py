@@ -28,7 +28,7 @@ router = APIRouter(tags=["access-log"])
 # ── 경로 → 메뉴명 매핑 ────────────────────────────────────────────────────
 MENU_MAP = {
     "/dashboard": "Home",
-    "/board": "Notice",
+    "/board": "공지사항",
     "/permissions": "권한 신청",
     "/me": "내정보",
     "/files": "저장소 (S3)",

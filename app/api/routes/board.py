@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, UploadFile
 
 from app.api.deps import get_board_service, require_admin
+from app.core.dateutil import parse_date
 from app.schemas.auth import UserRead
 from app.schemas.board import BoardCreate, BoardListItem, BoardRead, BoardUpdate
 from app.schemas.common import MessageResponse
@@ -14,9 +15,11 @@ def list_boards(
     board_type: str = "notice",
     page: int = 1,
     size: int = 20,
+    date_from: str | None = None,
+    date_to: str | None = None,
     service: BoardService = Depends(get_board_service),
 ):
-    items, total = service.list_boards(board_type, page, size)
+    items, total = service.list_boards(board_type, page, size, parse_date(date_from), parse_date(date_to))
     return {"items": [i.model_dump() for i in items], "total": total, "page": page, "size": size}
 
 

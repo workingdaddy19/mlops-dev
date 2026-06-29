@@ -1,3 +1,5 @@
+from datetime import date, timedelta
+
 from sqlalchemy.orm import Session
 
 from app.models.board import Board, BoardFile
@@ -7,8 +9,13 @@ class BoardRepository:
     def __init__(self, session: Session):
         self.session = session
 
-    def list_by_type(self, board_type: str, offset: int = 0, limit: int = 20) -> tuple[list[Board], int]:
+    def list_by_type(self, board_type: str, offset: int = 0, limit: int = 20,
+                     dt_from: date | None = None, dt_to: date | None = None) -> tuple[list[Board], int]:
         query = self.session.query(Board).filter(Board.board_type == board_type)
+        if dt_from:
+            query = query.filter(Board.created_at >= dt_from)
+        if dt_to:
+            query = query.filter(Board.created_at < dt_to + timedelta(days=1))
         total = query.count()
         items = query.order_by(Board.id.desc()).offset(offset).limit(limit).all()
         return items, total

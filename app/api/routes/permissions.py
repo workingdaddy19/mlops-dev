@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, get_db, require_admin
+from app.core.dateutil import parse_date
 from app.models.permission_request import PermissionRequest, VALID_STATUSES
 from app.models.user_permission import VALID_FEATURES
 from app.repositories.permission_request_repo import PermissionRequestRepository
@@ -61,12 +62,33 @@ def create_request(
 
 @router.get("/requests/me", response_model=list[PermissionRequestRead])
 def my_requests(
+    date_from: str | None = None,
+    date_to: str | None = None,
     current_user: UserRead = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """본인의 권한 신청 내역."""
-    items = PermissionRequestRepository(db).list_by_user(current_user.id)
+    """본인의 권한 신청 내역. 신청일 기간 필터."""
+    items = PermissionRequestRepository(db).list_by_user(
+        current_user.id, parse_date(date_from), parse_date(date_to))
     return [PermissionRequestRead.model_validate(r) for r in items]
+
+
+@router.delete("/requests/{req_id}", status_code=204)
+def delete_my_request(
+    req_id: int,
+    current_user: UserRead = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """승인 안 된 본인 신청 삭제(취소). approved는 삭제 불가."""
+    repo = PermissionRequestRepository(db)
+    req = repo.get_by_id(req_id)
+    if not req:
+        raise HTTPException(status_code=404, detail="신청을 찾을 수 없습니다.")
+    if req.user_id != current_user.id and current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="본인 신청만 삭제할 수 있습니다.")
+    if req.status == "approved":
+        raise HTTPException(status_code=400, detail="승인된 신청은 삭제할 수 없습니다.")
+    repo.delete(req)
 
 
 # ═══════════════════════════════════════════
@@ -76,13 +98,17 @@ def my_requests(
 @admin_router.get("", response_model=list[PermissionRequestRead])
 def list_requests(
     status: str | None = Query(default=None, description="pending/approved/rejected 필터"),
+    username: str | None = None,
+    date_from: str | None = None,
+    date_to: str | None = None,
     _admin: UserRead = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
-    """전체 권한 신청 목록 (사용자 ID 포함) — admin only."""
+    """전체 권한 신청 목록 — admin only. 사번(username)·신청일 필터."""
     if status and status not in VALID_STATUSES:
         raise HTTPException(status_code=400, detail=f"유효하지 않은 상태: {status}")
-    items = PermissionRequestRepository(db).list_all(status)
+    items = PermissionRequestRepository(db).list_all(
+        status, username or None, parse_date(date_from), parse_date(date_to))
     return [PermissionRequestRead.model_validate(r) for r in items]
 
 

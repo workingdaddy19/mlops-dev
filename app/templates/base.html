@@ -1,157 +1,182 @@
 <!DOCTYPE html>
 <html lang="ko">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{% block title %}AI 데이터 분석{% endblock %}</title>
   <!-- Favicon: AI 텍스트 SVG -->
-  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%230d9488'/%3E%3Ctext x='50%25' y='50%25' font-family='system-ui,sans-serif' font-size='11' font-weight='700' fill='white' text-anchor='middle' dominant-baseline='central'%3EAI%3C/text%3E%3C/svg%3E">
+  <link rel="icon" type="image/svg+xml"
+    href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%230d9488'/%3E%3Ctext x='50%25' y='50%25' font-family='system-ui,sans-serif' font-size='11' font-weight='700' fill='white' text-anchor='middle' dominant-baseline='central'%3EAI%3C/text%3E%3C/svg%3E">
   <link rel="stylesheet" href="/static/css/main.css">
 </head>
+
 <body data-page="{{ active_page }}">
 
-<!-- ── Top Header (전체 폭) ─────────────────── -->
-<header class="app-header">
-  <button class="sidebar-toggle" id="sidebarToggle" title="메뉴 접기/펼치기">
-    <span class="toggle-icon">&#9776;</span>
-  </button>
-  <a href="/dashboard" class="sidebar-brand">
-    <span class="brand-icon">AI</span>
-    <span class="brand-text">AI 데이터 분석</span>
-  </a>
-  <div class="header-spacer"></div>
-  <div class="header-user">
-    <span class="hu-name"><span class="user-avatar">👤</span><span id="hu-name"></span></span>
-    <a class="hu-link" href="/me">내정보</a>
-    <button class="hu-logout" onclick="userLogout()" title="로그아웃">
-      <span>🚪</span><span>로그아웃</span>
+  <!-- ── Top Header (전체 폭) ─────────────────── -->
+  <header class="app-header">
+    <button class="sidebar-toggle" id="sidebarToggle" title="메뉴 접기/펼치기">
+      <span class="toggle-icon">&#9776;</span>
     </button>
-  </div>
-</header>
-
-<!-- ── Left Sidebar ────────────────────────── -->
-<aside class="sidebar" id="sidebar">
-  <div class="sidebar-menu-wrapper">
-    <!-- Home -->
-    <a href="/dashboard" class="sidebar-item {% if active_page=='dashboard' %}active{% endif %}">
-      <span class="s-icon">🏠</span><span class="s-label">Home</span>
+    <a href="/dashboard" class="sidebar-brand">
+      <span class="brand-icon">AI</span>
+      <span class="brand-text">AI 데이터 분석</span>
     </a>
-
-    <!-- Notice (admin only — shown by JS) -->
-    <a href="/board" id="nav-notice" style="display:none;" class="sidebar-item {% if active_page=='board' %}active{% endif %}">
-      <span class="s-icon">📢</span><span class="s-label">Notice</span>
-    </a>
-
-    <div class="sidebar-divider"></div>
-
-    <!-- 프로젝트 (전 사용자) -->
-    <div class="sidebar-group open" id="grp-project">
-      <button class="sidebar-group-btn" onclick="toggleGroup('grp-project')">
-        <span class="s-icon">📌</span>
-        <span class="s-label">프로젝트</span>
-        <span class="s-arrow"></span>
+    <div class="header-spacer"></div>
+    <div class="header-user">
+      <span class="hu-name"><span class="user-avatar">👤</span><span id="hu-name"></span></span>
+      <a class="hu-link" href="/me">내정보</a>
+      <button class="hu-logout" onclick="userLogout()" title="로그아웃">
+        <span>🚪</span><span>로그아웃</span>
       </button>
-      <div class="sidebar-sub">
-        <a href="/resource/projects" class="sidebar-subitem {% if active_page in ('resource-projects','resource-project') %}active{% endif %}"><span class="s-icon">🗂️</span><span class="s-label">분석 과제</span></a>
-        <a href="/permissions" class="sidebar-subitem {% if active_page=='permissions' %}active{% endif %}"><span class="s-icon">🔑</span><span class="s-label">권한 신청</span></a>
+    </div>
+  </header>
+
+  <!-- ── Left Sidebar ────────────────────────── -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-menu-wrapper">
+      <!-- Home -->
+      <a href="/dashboard" class="sidebar-item {% if active_page=='dashboard' %}active{% endif %}">
+        <span class="s-icon">🏠</span><span class="s-label">Home</span>
+      </a>
+
+      <!-- Notice (admin only — shown by JS) -->
+      <a href="/board" id="nav-notice" style="display:none;"
+        class="sidebar-item {% if active_page=='board' %}active{% endif %}">
+        <span class="s-icon">📢</span><span class="s-label">공지사항</span>
+      </a>
+
+      <div class="sidebar-divider"></div>
+
+      <!-- 프로젝트 (전 사용자) -->
+      <div class="sidebar-group open" id="grp-project">
+        <button class="sidebar-group-btn" onclick="toggleGroup('grp-project')">
+          <span class="s-icon">📌</span>
+          <span class="s-label">프로젝트</span>
+          <span class="s-arrow"></span>
+        </button>
+        <div class="sidebar-sub">
+          <a href="/resource/projects"
+            class="sidebar-subitem {% if active_page in ('resource-projects','resource-project') %}active{% endif %}"><span
+              class="s-icon">🗂️</span><span class="s-label">분석 과제</span></a>
+          <a href="/permissions" class="sidebar-subitem {% if active_page=='permissions' %}active{% endif %}"><span
+              class="s-icon">🔑</span><span class="s-label">권한 신청</span></a>
+        </div>
+      </div>
+
+      <!-- Data -->
+      <div class="sidebar-group open" id="grp-data">
+        <button class="sidebar-group-btn" onclick="toggleGroup('grp-data')">
+          <span class="s-icon">📁</span>
+          <span class="s-label">Data</span>
+          <span class="s-arrow"></span>
+        </button>
+        <div class="sidebar-sub">
+          <a href="/files" class="sidebar-subitem {% if active_page=='files'                 %}active{% endif %}"><span
+              class="s-icon">🗄️</span><span class="s-label">저장소 (S3)</span></a>
+          <a href="/data/query"
+            class="sidebar-subitem {% if active_page in ('query','datasets') %}active{% endif %}"><span
+              class="s-icon">📊</span><span class="s-label">데이터조회(Athena)</span></a>
+        </div>
+      </div>
+
+      <!-- Analysis -->
+      <div class="sidebar-group open" id="grp-analysis">
+        <button class="sidebar-group-btn" onclick="toggleGroup('grp-analysis')">
+          <span class="s-icon">🔬</span>
+          <span class="s-label">Analysis</span>
+          <span class="s-arrow"></span>
+        </button>
+        <div class="sidebar-sub">
+          <a href="/aiml/jupyter" class="sidebar-subitem {% if active_page=='jupyter' %}active{% endif %}"><span
+              class="s-icon">📓</span><span class="s-label">분석기(Jupyter)</span></a>
+          <a href="/aiml/experiments" class="sidebar-subitem {% if active_page=='experiments' %}active{% endif %}"><span
+              class="s-icon">🧪</span><span class="s-label">실험/모델</span></a>
+        </div>
+      </div>
+
+      <div class="sidebar-divider"></div>
+
+      <!-- 분석 자원 관리 (admin only — shown by JS) -->
+      <div class="sidebar-group open" id="grp-resource" style="display:none;">
+        <button class="sidebar-group-btn" onclick="toggleGroup('grp-resource')">
+          <span class="s-icon">🧮</span>
+          <span class="s-label">분석자원</span>
+          <span class="s-arrow"></span>
+        </button>
+        <div class="sidebar-sub">
+          <a href="/resource/dashboard"
+            class="sidebar-subitem {% if active_page=='resource-dashboard' %}active{% endif %}"><span
+              class="s-icon">📊</span><span class="s-label">자원 대시보드</span></a>
+          <a href="/admin/resource-reclaim"
+            class="sidebar-subitem {% if active_page=='resource-reclaim' %}active{% endif %}"><span
+              class="s-icon">♻️</span><span class="s-label">회수 현황</span></a>
+        </div>
+      </div>
+
+      <!-- Management (admin only — shown by JS) -->
+      <div class="sidebar-group open" id="grp-mgmt" style="display:none;">
+        <button class="sidebar-group-btn" onclick="toggleGroup('grp-mgmt')">
+          <span class="s-icon">⚙️</span>
+          <span class="s-label">Management</span>
+          <span class="s-arrow"></span>
+        </button>
+        <div class="sidebar-sub">
+          <a href="/admin/users" class="sidebar-subitem {% if active_page=='admin-users'    %}active{% endif %}"><span
+              class="s-icon">👥</span><span class="s-label">사용자 관리</span></a>
+          <a href="/admin/permission-requests"
+            class="sidebar-subitem {% if active_page=='admin-permission-requests' %}active{% endif %}"><span
+              class="s-icon">🔑</span><span class="s-label">권한 신청 관리</span></a>
+          <a href="/admin/access-log"
+            class="sidebar-subitem {% if active_page=='admin-access-log' %}active{% endif %}"><span
+              class="s-icon">🛡️</span><span class="s-label">접속 기록</span></a>
+          <a href="/admin/settings"
+            class="sidebar-subitem {% if active_page=='admin-settings' %}active{% endif %}"><span
+              class="s-icon">🔧</span><span class="s-label">설정</span></a>
+        </div>
       </div>
     </div>
 
-    <!-- Data -->
-    <div class="sidebar-group open" id="grp-data">
-      <button class="sidebar-group-btn" onclick="toggleGroup('grp-data')">
-        <span class="s-icon">📁</span>
-        <span class="s-label">Data</span>
-        <span class="s-arrow"></span>
-      </button>
-      <div class="sidebar-sub">
-        <a href="/files"       class="sidebar-subitem {% if active_page=='files'                 %}active{% endif %}"><span class="s-icon">🗄️</span><span class="s-label">저장소 (S3)</span></a>
-        <a href="/data/query"  class="sidebar-subitem {% if active_page in ('query','datasets') %}active{% endif %}"><span class="s-icon">📊</span><span class="s-label">데이터조회(Athena)</span></a>
-      </div>
+    <!-- 드래그 리사이저 (확장 모드 전용) -->
+    <div class="sidebar-resizer" id="sidebarResizer"></div>
+  </aside>
+
+  <!-- ── Main Content ────────────────────────── -->
+  <main class="main-content" id="mainContent">
+    <div class="breadcrumb">
+      {% block breadcrumb %}{% endblock %}
     </div>
-
-    <!-- Analysis -->
-    <div class="sidebar-group open" id="grp-analysis">
-      <button class="sidebar-group-btn" onclick="toggleGroup('grp-analysis')">
-        <span class="s-icon">🔬</span>
-        <span class="s-label">Analysis</span>
-        <span class="s-arrow"></span>
-      </button>
-      <div class="sidebar-sub">
-        <a href="/aiml/jupyter" class="sidebar-subitem {% if active_page=='jupyter' %}active{% endif %}"><span class="s-icon">📓</span><span class="s-label">분석기(Jupyter)</span></a>
-        <a href="/aiml/experiments" class="sidebar-subitem {% if active_page=='experiments' %}active{% endif %}"><span class="s-icon">🧪</span><span class="s-label">실험/모델</span></a>
-      </div>
+    <div class="page-content">
+      {% block content %}{% endblock %}
     </div>
+  </main>
 
-    <div class="sidebar-divider"></div>
-
-    <!-- 분석 자원 관리 (admin only — shown by JS) -->
-    <div class="sidebar-group open" id="grp-resource" style="display:none;">
-      <button class="sidebar-group-btn" onclick="toggleGroup('grp-resource')">
-        <span class="s-icon">🧮</span>
-        <span class="s-label">분석자원</span>
-        <span class="s-arrow"></span>
-      </button>
-      <div class="sidebar-sub">
-        <a href="/resource/dashboard" class="sidebar-subitem {% if active_page=='resource-dashboard' %}active{% endif %}"><span class="s-icon">📊</span><span class="s-label">자원 대시보드</span></a>
-        <a href="/admin/resource-reclaim" class="sidebar-subitem {% if active_page=='resource-reclaim' %}active{% endif %}"><span class="s-icon">♻️</span><span class="s-label">회수 현황</span></a>
+  <!-- 비밀번호 변경 모달 (전 페이지 공통) -->
+  <div class="modal-overlay" id="changePwModal">
+    <div class="modal-box" style="width:420px; max-width:95vw;">
+      <div class="modal-title">비밀번호 변경</div>
+      <div class="form-group">
+        <label class="form-label">현재 비밀번호 *</label>
+        <input id="cp-current" class="form-input" type="password" autocomplete="current-password">
       </div>
-    </div>
-
-    <!-- Management (admin only — shown by JS) -->
-    <div class="sidebar-group open" id="grp-mgmt" style="display:none;">
-      <button class="sidebar-group-btn" onclick="toggleGroup('grp-mgmt')">
-        <span class="s-icon">⚙️</span>
-        <span class="s-label">Management</span>
-        <span class="s-arrow"></span>
-      </button>
-      <div class="sidebar-sub">
-        <a href="/admin/users"    class="sidebar-subitem {% if active_page=='admin-users'    %}active{% endif %}"><span class="s-icon">👥</span><span class="s-label">Users</span></a>
-        <a href="/admin/permission-requests" class="sidebar-subitem {% if active_page=='admin-permission-requests' %}active{% endif %}"><span class="s-icon">🔑</span><span class="s-label">권한 신청 관리</span></a>
-        <a href="/admin/access-log" class="sidebar-subitem {% if active_page=='admin-access-log' %}active{% endif %}"><span class="s-icon">🛡️</span><span class="s-label">접속 기록</span></a>
-        <a href="/admin/settings" class="sidebar-subitem {% if active_page=='admin-settings' %}active{% endif %}"><span class="s-icon">🔧</span><span class="s-label">Settings</span></a>
+      <div class="form-group">
+        <label class="form-label">새 비밀번호 * <span style="font-weight:400; color:var(--text-muted); font-size:11px;">(8자
+            이상, 영문+숫자 포함)</span></label>
+        <input id="cp-new" class="form-input" type="password" autocomplete="new-password">
+      </div>
+      <div class="form-group">
+        <label class="form-label">새 비밀번호 확인 *</label>
+        <input id="cp-confirm" class="form-input" type="password" autocomplete="new-password">
+      </div>
+      <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:20px;">
+        <button class="btn btn-secondary" id="cp-cancel" onclick="closeChangePwModal()">취소</button>
+        <button class="btn btn-primary" onclick="submitChangePassword()">변경</button>
       </div>
     </div>
   </div>
 
-  <!-- 드래그 리사이저 (확장 모드 전용) -->
-  <div class="sidebar-resizer" id="sidebarResizer"></div>
-</aside>
-
-<!-- ── Main Content ────────────────────────── -->
-<main class="main-content" id="mainContent">
-  <div class="breadcrumb">
-    {% block breadcrumb %}{% endblock %}
-  </div>
-  <div class="page-content">
-    {% block content %}{% endblock %}
-  </div>
-</main>
-
-<!-- 비밀번호 변경 모달 (전 페이지 공통) -->
-<div class="modal-overlay" id="changePwModal">
-  <div class="modal-box" style="width:420px; max-width:95vw;">
-    <div class="modal-title">비밀번호 변경</div>
-    <div class="form-group">
-      <label class="form-label">현재 비밀번호 *</label>
-      <input id="cp-current" class="form-input" type="password" autocomplete="current-password">
-    </div>
-    <div class="form-group">
-      <label class="form-label">새 비밀번호 * <span style="font-weight:400; color:var(--text-muted); font-size:11px;">(8자 이상, 영문+숫자 포함)</span></label>
-      <input id="cp-new" class="form-input" type="password" autocomplete="new-password">
-    </div>
-    <div class="form-group">
-      <label class="form-label">새 비밀번호 확인 *</label>
-      <input id="cp-confirm" class="form-input" type="password" autocomplete="new-password">
-    </div>
-    <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:20px;">
-      <button class="btn btn-secondary" id="cp-cancel" onclick="closeChangePwModal()">취소</button>
-      <button class="btn btn-primary" onclick="submitChangePassword()">변경</button>
-    </div>
-  </div>
-</div>
-
-<script src="/static/js/app.js"></script>
-{% block scripts %}{% endblock %}
+  <script src="/static/js/app.js"></script>
+  {% block scripts %}{% endblock %}
 </body>
+
 </html>

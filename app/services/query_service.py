@@ -9,6 +9,6 @@ class QueryService:
         self.session = session
         self.history_repo = history_repo
 
-    def get_history(self, username: str) -> list[QueryHistoryRead]:
-        items = self.history_repo.list_by_user(username)
+    def get_history(self, username: str, dt_from=None, dt_to=None) -> list[QueryHistoryRead]:
+        items = self.history_repo.list_by_user(username, dt_from, dt_to)
         return [QueryHistoryRead.model_validate(h) for h in items]

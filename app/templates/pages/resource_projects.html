@@ -10,17 +10,25 @@
 
 {% block content %}
 <div class="card">
-  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
-    <div class="card-title" style="margin-bottom:0;" id="proj-heading">🗂️ 분석 과제</div>
-    <div style="display:flex; gap:8px; align-items:center;">
+  <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:14px; flex-wrap:nowrap;">
+    <div class="card-title" style="margin:0; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" id="proj-heading">🗂️ 분석 과제</div>
+    <div style="display:flex; gap:8px; align-items:center; flex-shrink:0;">
       <select id="status-filter" class="form-select" style="padding:4px 10px; font-size:13px; display:none;" onchange="loadProjects()">
         <option value="">전체</option>
         <option value="planning">계획</option>
         <option value="active">진행</option>
         <option value="completed">완료</option>
       </select>
-      <button class="btn btn-primary" onclick="openCreateModal()">+ 과제 등록</button>
+      <button class="btn btn-primary" style="white-space:nowrap;" onclick="openCreateModal()">+ 과제 등록</button>
     </div>
+  </div>
+
+  <div class="filter-bar">
+    <div class="fb-field" id="q-name-field"><label>과제명</label><input id="q-name" class="form-input" placeholder="과제명" autocomplete="new-password"></div>
+    <div class="fb-field" id="q-owner-field"><label>담당자</label><input id="q-owner" class="form-input" placeholder="담당자" autocomplete="new-password"></div>
+    <div class="fb-field"><label>시작일</label><input id="q-from" type="date" class="form-input" autocomplete="new-password"></div>
+    <div class="fb-field"><label>종료일</label><input id="q-to" type="date" class="form-input" autocomplete="new-password"></div>
+    <button class="btn btn-primary" style="padding:5px 14px; font-size:13px;" onclick="loadProjects()">🔍 조회</button>
   </div>
 
   <div id="proj-status" style="font-size:13px; color:var(--text-muted); margin-bottom:12px;"></div>
@@ -31,17 +39,19 @@
         <tr>
           <th style="width:150px;">코드</th>
           <th>과제명</th>
-          <th style="width:100px;">담당자</th>
+          <th style="width:100px;">사번</th>
+          <th style="width:100px;">이름</th>
           <th style="width:170px;">기간</th>
           <th style="width:80px; text-align:center;">상태</th>
           <th style="width:170px;">작업</th>
         </tr>
       </thead>
       <tbody id="proj-tbody">
-        <tr><td colspan="6" style="text-align:center; color:var(--text-muted); padding:24px;">로딩 중...</td></tr>
+        <tr><td colspan="7" style="text-align:center; color:var(--text-muted); padding:24px;">로딩 중...</td></tr>
       </tbody>
     </table>
   </div>
+  <div class="list-pager" id="proj-pager"></div>
 </div>
 
 <!-- 과제 등록 모달 -->
@@ -50,43 +60,43 @@
     <div class="modal-title">분석 과제 등록 (과제 정의서)</div>
     <div class="form-group">
       <label class="form-label">과제명 *</label>
-      <input id="f-name" class="form-input" placeholder="예: 고객 이탈 예측 모델 v2">
+      <input id="f-name" class="form-input" placeholder="예: 고객 이탈 예측 모델 v2" autocomplete="new-password">
     </div>
     <div style="display:flex; gap:10px;">
       <div class="form-group" style="flex:1;" id="owner-group">
         <label class="form-label">담당자 *</label>
-        <input id="f-owner" class="form-input" placeholder="예: 김분석">
+        <input id="f-owner" class="form-input" placeholder="예: 김분석" autocomplete="new-password">
       </div>
       <div class="form-group" style="width:130px;">
         <label class="form-label">코드</label>
-        <input id="f-code" class="form-input" placeholder="비우면 자동생성">
+        <input id="f-code" class="form-input" placeholder="비우면 자동생성" autocomplete="new-password">
       </div>
       <div class="form-group" style="width:90px;">
         <label class="form-label">인원수</label>
-        <input id="f-member-count" class="form-input" type="number" min="1" value="1">
+        <input id="f-member-count" class="form-input" type="number" min="1" value="1" autocomplete="new-password">
       </div>
     </div>
     <div style="display:flex; gap:10px;">
       <div class="form-group" style="flex:1;">
         <label class="form-label">기간 시작</label>
-        <input id="f-start" class="form-input" type="date">
+        <input id="f-start" class="form-input" type="date" autocomplete="new-password">
       </div>
       <div class="form-group" style="flex:1;">
         <label class="form-label">기간 종료</label>
-        <input id="f-end" class="form-input" type="date">
+        <input id="f-end" class="form-input" type="date" autocomplete="new-password">
       </div>
     </div>
     <div class="form-group">
       <label class="form-label">분석가 명단</label>
-      <input id="f-members" class="form-input" placeholder="예: 김분석, 이데이터, 박모델">
+      <input id="f-members" class="form-input" placeholder="예: 김분석, 이데이터, 박모델" autocomplete="new-password">
     </div>
     <div class="form-group">
       <label class="form-label">분석 데이터 종류</label>
-      <input id="f-data-types" class="form-input" placeholder="예: 거래로그, 고객마스터, 상품정보">
+      <input id="f-data-types" class="form-input" placeholder="예: 거래로그, 고객마스터, 상품정보" autocomplete="new-password">
     </div>
     <div class="form-group">
       <label class="form-label">데이터셋 / 출처</label>
-      <input id="f-datasets" class="form-input" placeholder="예: athena.tx_log (2.1억행), s3://.../cust">
+      <input id="f-datasets" class="form-input" placeholder="예: athena.tx_log (2.1억행), s3://.../cust" autocomplete="new-password">
     </div>
     <div style="display:flex; gap:10px;">
       <div class="form-group" style="flex:1;">
@@ -99,11 +109,11 @@
       </div>
       <div class="form-group" style="flex:1;">
         <label class="form-label">협의일</label>
-        <input id="f-sec-date" class="form-input" type="date">
+        <input id="f-sec-date" class="form-input" type="date" autocomplete="new-password">
       </div>
       <div class="form-group" style="flex:1;">
         <label class="form-label">ITSM 티켓</label>
-        <input id="f-itsm" class="form-input" placeholder="예: ITSM-12345">
+        <input id="f-itsm" class="form-input" placeholder="예: ITSM-12345" autocomplete="new-password">
       </div>
     </div>
     <div class="form-group">
@@ -125,8 +135,10 @@
     <div id="rq-proj" style="font-size:13px; color:var(--text-secondary); margin-bottom:12px;"></div>
     <div class="form-group">
       <label class="form-label">자원 프로파일(용량) *</label>
-      <select id="rq-profile" class="form-select"></select>
+      <select id="rq-profile" class="form-select" onchange="updateRqSpec()"></select>
     </div>
+    <div id="rq-spec" style="font-size:12px; color:var(--text-secondary); margin:-8px 0 10px;">—</div>
+    <div id="rq-cap" style="font-size:12px; padding:8px 12px; border-radius:6px; background:#f0fdfa; border:1px solid #99f6e4; margin-bottom:12px;">산정서 한도 확인 중...</div>
     <div style="display:flex; gap:10px;">
       <div class="form-group" style="flex:1;">
         <label class="form-label">사용 시작일 *</label>
@@ -160,51 +172,67 @@ const PROJ_STATUS = {
 let IS_ADMIN = false;
 let PROFILES = [];
 
+const projPager = makePager(5, renderProjectRows, 'proj-pager');
+
 document.addEventListener('DOMContentLoaded', () => {
   const u = Auth.getUser();
   IS_ADMIN = !!(u && u.role === 'admin');
   document.getElementById('proj-heading').textContent = IS_ADMIN ? '🗂️ 분석 과제 관리' : '🗂️ 내 분석 과제';
   if (IS_ADMIN) document.getElementById('status-filter').style.display = '';
-  if (!IS_ADMIN) document.getElementById('owner-group').style.display = 'none';
+  if (!IS_ADMIN) {
+    document.getElementById('owner-group').style.display = 'none';
+    document.getElementById('q-name-field').style.display = 'none';
+    document.getElementById('q-owner-field').style.display = 'none';
+  }
+  fillDefaultRange('q-from', 'q-to');
   loadProjects();
 });
 
 async function loadProjects() {
   const tbody = document.getElementById('proj-tbody');
   const statusEl = document.getElementById('proj-status');
-  tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:24px;">로딩 중...</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:24px;">로딩 중...</td></tr>';
 
-  let url;
+  const params = new URLSearchParams();
   if (IS_ADMIN) {
-    const filter = document.getElementById('status-filter').value;
-    url = '/api/resource/projects' + (filter ? `?status=${filter}` : '');
-  } else {
-    url = '/api/resource/projects/mine';
+    const f = document.getElementById('status-filter').value; if (f) params.set('status', f);
+    const nm = document.getElementById('q-name').value.trim(); if (nm) params.set('name', nm);
+    const ow = document.getElementById('q-owner').value.trim(); if (ow) params.set('owner', ow);
   }
-  const res = await apiFetch(url);
+  dateRangeParams('q-from', 'q-to', params);
+  const base = IS_ADMIN ? '/api/resource/projects' : '/api/resource/projects/mine';
+  const qs = params.toString();
+  const res = await apiFetch(base + (qs ? '?' + qs : ''));
   if (!res) return;
-  if (!res.ok) { statusEl.textContent = '조회 실패'; tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:#ef4444;padding:24px;">조회 실패</td></tr>`; return; }
+  if (!res.ok) { statusEl.textContent = '조회 실패'; tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;color:#ef4444;padding:24px;">조회 실패</td></tr>`; return; }
 
   const items = await res.json();
   statusEl.textContent = `총 ${items.length}건`;
+  projPager.set(items);
+}
+
+function renderProjectRows(items) {
+  const tbody = document.getElementById('proj-tbody');
   if (!items.length) {
-    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:24px;">${IS_ADMIN ? '등록된 과제가 없습니다.' : '참여 중인 과제가 없습니다. 과제를 등록해 자원을 신청하세요.'}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:24px;">${IS_ADMIN ? '등록된 과제가 없습니다.' : '참여 중인 과제가 없습니다. 과제를 등록해 자원을 신청하세요.'}</td></tr>`;
     return;
   }
-
   tbody.innerHTML = items.map(p => {
     const st = PROJ_STATUS[p.status] || PROJ_STATUS.planning;
     const period = (p.period_start || '?') + ' ~ ' + (p.period_end || '?');
+    const delBtn = (IS_ADMIN && p.status === 'planning')
+      ? `<button class="btn btn-danger" style="padding:4px 10px;font-size:12px;margin-left:4px;" onclick="deleteProject(${p.id},'${escapeAttr(p.code)}')">삭제</button>`
+      : '';
     const actions = IS_ADMIN
-      ? `<a class="btn btn-secondary" style="padding:4px 10px;font-size:12px;" href="/resource/projects/${p.id}">상세</a>
-         <button class="btn btn-danger" style="padding:4px 10px;font-size:12px;margin-left:4px;" onclick="deleteProject(${p.id},'${escapeAttr(p.code)}')">삭제</button>`
+      ? `<a class="btn btn-secondary" style="padding:4px 10px;font-size:12px;" href="/resource/projects/${p.id}">상세</a>${delBtn}`
       : `<a class="btn btn-secondary" style="padding:4px 10px;font-size:12px;" href="/resource/projects/${p.id}">상세</a>
          <button class="btn btn-primary" style="padding:4px 10px;font-size:12px;margin-left:4px;" onclick="openReqModal(${p.id},'${escapeAttr(p.code)}','${escapeAttr(p.name)}')">자원 신청</button>`;
     return `
       <tr>
         <td><a href="/resource/projects/${p.id}" style="font-family:monospace; font-size:12px; color:var(--primary); font-weight:600;">${escapeHtml(p.code)}</a></td>
         <td><a href="/resource/projects/${p.id}" style="font-weight:600;">${escapeHtml(p.name)}</a></td>
-        <td>${escapeHtml(p.owner)}</td>
+        <td style="font-size:12px;">${escapeHtml(p.created_by || '-')}</td>
+        <td style="font-size:12px;">${escapeHtml(p.owner || '-')}</td>
         <td style="font-size:12px; color:var(--text-muted);">${escapeHtml(period)}</td>
         <td style="text-align:center;"><span style="font-size:11px;padding:2px 8px;border-radius:99px;background:${st.bg};color:${st.fg};font-weight:600;">${st.text}</span></td>
         <td>${actions}</td>
@@ -270,8 +298,17 @@ async function openReqModal(projectId, code, name) {
   document.getElementById('rq-start').value = '';
   document.getElementById('rq-end').value = '';
   document.getElementById('rq-note').value = '';
+  updateRqSpec();
+  loadCapBanner(projectId, 'rq-cap');
   document.getElementById('reqModal').dataset.projectId = projectId;
   document.getElementById('reqModal').classList.add('open');
+}
+function updateRqSpec() {
+  const sv = document.getElementById('rq-profile').value;
+  const p = PROFILES.find(x => (x.server || '') === sv);
+  document.getElementById('rq-spec').textContent = p
+    ? `용량: ${p.vcpu ?? '-'} vCPU · ${p.mem_gb ?? '-'} GB · GPU ${p.gpu ?? 0}`
+    : '용량 정보 없음';
 }
 function closeReqModal() { document.getElementById('reqModal').classList.remove('open'); }
 

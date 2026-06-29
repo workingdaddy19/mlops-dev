@@ -10,17 +10,24 @@
 
 {% block content %}
 <div class="card">
-  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
-    <div class="card-title" style="margin-bottom:0;">🔑 권한 신청 관리</div>
-    <div style="display:flex; gap:8px; align-items:center;">
+  <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:16px; flex-wrap:nowrap;">
+    <div class="card-title" style="margin-bottom:0; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">🔑 권한 신청 관리</div>
+    <div style="display:flex; gap:8px; align-items:center; flex-shrink:0;">
       <select id="status-filter" class="form-select" style="padding:4px 10px; font-size:13px;" onchange="loadRequests()">
         <option value="pending">대기중</option>
         <option value="approved">승인됨</option>
         <option value="rejected">거부됨</option>
         <option value="">전체</option>
       </select>
-      <button class="btn btn-secondary" style="padding:4px 12px; font-size:12px;" onclick="loadRequests()">🔄 새로고침</button>
+      <button class="btn btn-secondary" style="padding:4px 12px; font-size:12px; white-space:nowrap; flex-shrink:0;" onclick="loadRequests()">🔄 새로고침</button>
     </div>
+  </div>
+
+  <div class="filter-bar">
+    <div class="fb-field"><label>사번</label><input id="q-username" class="form-input" placeholder="사번" autocomplete="new-password"></div>
+    <div class="fb-field"><label>신청 시작일</label><input id="q-from" type="date" class="form-input" autocomplete="new-password"></div>
+    <div class="fb-field"><label>신청 종료일</label><input id="q-to" type="date" class="form-input" autocomplete="new-password"></div>
+    <button class="btn btn-primary" style="padding:5px 14px; font-size:13px;" onclick="loadRequests()">🔍 조회</button>
   </div>
 
   <div id="req-status" style="font-size:13px; color:var(--text-muted); margin-bottom:12px;"></div>
@@ -30,7 +37,7 @@
       <thead>
         <tr>
           <th style="width:140px;">신청 시각</th>
-          <th style="width:140px;">사용자 ID</th>
+          <th style="width:140px;">사번</th>
           <th style="width:120px;">기능</th>
           <th>사유</th>
           <th style="width:90px; text-align:center;">상태</th>
@@ -42,6 +49,7 @@
       </tbody>
     </table>
   </div>
+  <div class="list-pager" id="req-pager"></div>
 </div>
 {% endblock %}
 
@@ -54,16 +62,24 @@ const STATUS_STYLE = {
   rejected: { text: '거부',   bg: '#fee2e2', fg: '#991b1b' },
 };
 
-document.addEventListener('DOMContentLoaded', loadRequests);
+const reqPager = makePager(10, renderReqRows, 'req-pager');
+
+document.addEventListener('DOMContentLoaded', () => { fillDefaultRange('q-from', 'q-to'); loadRequests(); });
 
 async function loadRequests() {
   const tbody = document.getElementById('req-tbody');
   const statusEl = document.getElementById('req-status');
-  const filter = document.getElementById('status-filter').value;
   tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:var(--text-muted); padding:24px;">로딩 중...</td></tr>';
 
-  const url = '/api/admin/permission-requests' + (filter ? `?status=${filter}` : '');
-  const res = await apiFetch(url);
+  fillDefaultRange('q-from', 'q-to');
+  const params = new URLSearchParams();
+  const filter = document.getElementById('status-filter').value;
+  if (filter) params.set('status', filter);
+  const un = document.getElementById('q-username').value.trim();
+  if (un) params.set('username', un);
+  dateRangeParams('q-from', 'q-to', params);
+  const qs = params.toString();
+  const res = await apiFetch('/api/admin/permission-requests' + (qs ? '?' + qs : ''));
   if (!res) return;
   if (res.status === 403) {
     tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:#ef4444; padding:24px;">⛔ 관리자 권한이 필요합니다.</td></tr>';
@@ -73,11 +89,15 @@ async function loadRequests() {
 
   const items = await res.json();
   statusEl.textContent = `${items.length}건`;
+  reqPager.set(items);
+}
+
+function renderReqRows(items) {
+  const tbody = document.getElementById('req-tbody');
   if (items.length === 0) {
     tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:var(--text-muted); padding:24px;">신청 내역이 없습니다.</td></tr>';
     return;
   }
-
   tbody.innerHTML = items.map(r => {
     const st = STATUS_STYLE[r.status] || STATUS_STYLE.pending;
     const action = r.status === 'pending'
@@ -87,7 +107,7 @@ async function loadRequests() {
     return `
       <tr>
         <td style="font-size:12px; color:var(--text-muted); white-space:nowrap;">${fmtTime(r.requested_at)}</td>
-        <td><strong>${escapeHtml(r.username)}</strong> <span style="color:var(--text-muted); font-size:11px;">#${r.user_id}</span></td>
+        <td><strong>${escapeHtml(r.username)}</strong></td>
         <td>${escapeHtml(FEAT_LABEL[r.feature] || r.feature)}</td>
         <td style="font-size:12px;">${escapeHtml(r.reason || '')}</td>
         <td style="text-align:center;">

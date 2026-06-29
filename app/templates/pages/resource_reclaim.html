@@ -14,18 +14,28 @@
   미회수 자원은 EKS 비용 누수로 직결됩니다. 회수 전 <b>사전통보 → 백업 → 삭제 → 대장종료</b> 절차를 권장합니다.
 </p>
 
+<div class="filter-bar">
+  <div class="fb-field"><label>과제명</label><input id="q-name" class="form-input" placeholder="과제명" autocomplete="new-password"></div>
+  <div class="fb-field"><label>신청자</label><input id="q-req" class="form-input" placeholder="사번/요청자" autocomplete="new-password"></div>
+  <div class="fb-field"><label>회수 시작일</label><input id="q-from" type="date" class="form-input" autocomplete="new-password"></div>
+  <div class="fb-field"><label>회수 종료일</label><input id="q-to" type="date" class="form-input" autocomplete="new-password"></div>
+  <button class="btn btn-primary" style="padding:5px 14px; font-size:13px;" onclick="load()">🔍 조회</button>
+</div>
+
 <div class="card" style="margin-bottom:16px;">
   <div class="card-title" style="font-size:15px;">🟠 회수 대기 (RECLAIM_PENDING)</div>
   <div style="overflow-x:auto;"><table class="data-table"><thead>
-    <tr><th style="width:130px;">코드 미리</th><th>네임스페이스/노드</th><th style="width:140px;">용량</th><th style="width:110px;">ITSM</th><th style="width:160px;">만료</th></tr>
-  </thead><tbody id="pending-tbody"><tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:16px;">로딩 중...</td></tr></tbody></table></div>
+    <tr><th>과제명</th><th style="width:110px;">신청자</th><th style="width:150px;">용량</th><th style="width:180px;">만료</th></tr>
+  </thead><tbody id="pending-tbody"><tr><td colspan="4" style="text-align:center;color:var(--text-muted);padding:16px;">로딩 중...</td></tr></tbody></table></div>
+  <div class="list-pager" id="pending-pager"></div>
 </div>
 
 <div class="card">
   <div class="card-title" style="font-size:15px;">✅ 회수 완료 (RECLAIMED)</div>
   <div style="overflow-x:auto;"><table class="data-table"><thead>
-    <tr><th>네임스페이스/노드</th><th style="width:140px;">용량</th><th style="width:110px;">ITSM</th><th style="width:110px;">회수일</th><th style="width:120px;">사유</th></tr>
+    <tr><th>과제명</th><th style="width:110px;">신청자</th><th style="width:150px;">용량</th><th style="width:110px;">회수일</th><th style="width:120px;">사유</th></tr>
   </thead><tbody id="done-tbody"><tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:16px;">로딩 중...</td></tr></tbody></table></div>
+  <div class="list-pager" id="done-pager"></div>
 </div>
 {% endblock %}
 
@@ -33,43 +43,52 @@
 <script>
 const RECLAIM_REASON = { expired:'정기(만료)', idle:'유휴(Idle)', event:'이벤트(중단/변경)' };
 
+const pendingPager = makePager(5, renderPendingRows, 'pending-pager');
+const donePager = makePager(5, renderDoneRows, 'done-pager');
+
 document.addEventListener('DOMContentLoaded', load);
 
 async function load() {
-  const res = await apiFetch('/api/resource/reclaim');
+  fillDefaultRange('q-from', 'q-to');
+  const params = new URLSearchParams();
+  const nm = document.getElementById('q-name').value.trim();
+  const rq = document.getElementById('q-req').value.trim();
+  if (nm) params.set('name', nm);
+  if (rq) params.set('requester', rq);
+  dateRangeParams('q-from', 'q-to', params);
+  const res = await apiFetch('/api/resource/reclaim?' + params.toString());
   if (!res) return;
-  if (res.status === 403) { document.getElementById('pending-tbody').innerHTML = '<tr><td colspan="5" style="text-align:center;color:#ef4444;padding:16px;">⛔ 관리자 권한이 필요합니다.</td></tr>'; return; }
+  if (res.status === 403) { document.getElementById('pending-tbody').innerHTML = '<tr><td colspan="4" style="text-align:center;color:#ef4444;padding:16px;">⛔ 관리자 권한이 필요합니다.</td></tr>'; return; }
   const d = await res.json();
-  renderPending(d.pending || []);
-  renderDone(d.reclaimed || []);
+  pendingPager.set(d.pending || []);
+  donePager.set(d.reclaimed || []);
 }
 
+function projOf(l){ return `<a href="/resource/projects/${l.project_id}" style="color:var(--primary);">${escapeHtml(l.project_name||('과제 #'+l.project_id))}</a><br><span style="color:var(--text-muted);font-family:monospace;font-size:11px;">${escapeHtml(l.project_code||'')}</span>`; }
 function capOf(l){ return `${fmtNum(l.alloc_vcpu)}vCPU / ${fmtNum(l.alloc_mem_gb)}GB${l.alloc_gpu?` / GPU${l.alloc_gpu}`:''}`; }
-function nodeOf(l){ return `${escapeHtml(l.namespace||'-')}<br><span style="color:var(--text-muted);">${escapeHtml(l.node_group||'')} ${escapeHtml(l.jupyter_server_type||'')}</span>`; }
 
-function renderPending(list) {
+function renderPendingRows(list) {
   const tbody = document.getElementById('pending-tbody');
-  if (!list.length) { tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:16px;">회수 대기 자원이 없습니다.</td></tr>'; return; }
+  if (!list.length) { tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--text-muted);padding:16px;">회수 대기 자원이 없습니다.</td></tr>'; return; }
   tbody.innerHTML = list.map(l => {
     const overdue = l.expiry_state === 'overdue';
     const exp = l.expires_at ? (overdue ? `${l.expires_at} <span style="color:#dc2626;font-weight:600;">(경과)</span>` : l.expires_at) : '-';
     return `<tr>
-      <td><a href="/resource/projects/${l.project_id}" style="font-size:12px;color:var(--primary);">과제 #${l.project_id}</a></td>
-      <td style="font-size:12px;">${nodeOf(l)}</td>
+      <td style="font-size:12px;">${projOf(l)}</td>
+      <td style="font-size:12px;">${escapeHtml(l.requester||'-')}</td>
       <td style="font-size:12px;">${capOf(l)}</td>
-      <td style="font-size:12px;">${escapeHtml(l.itsm_ticket||'-')}</td>
       <td style="font-size:12px;">${exp}</td>
     </tr>`;
   }).join('');
 }
 
-function renderDone(list) {
+function renderDoneRows(list) {
   const tbody = document.getElementById('done-tbody');
   if (!list.length) { tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:16px;">회수 완료 이력이 없습니다.</td></tr>'; return; }
   tbody.innerHTML = list.map(l => `<tr>
-      <td style="font-size:12px;">${nodeOf(l)}</td>
+      <td style="font-size:12px;">${projOf(l)}</td>
+      <td style="font-size:12px;">${escapeHtml(l.requester||'-')}</td>
       <td style="font-size:12px;">${capOf(l)}</td>
-      <td style="font-size:12px;">${escapeHtml(l.itsm_ticket||'-')}</td>
       <td style="font-size:12px;">${l.reclaimed_at||'-'}</td>
       <td style="font-size:12px;">${RECLAIM_REASON[l.reclaim_reason]||escapeHtml(l.reclaim_reason||'-')}</td>
     </tr>`).join('');

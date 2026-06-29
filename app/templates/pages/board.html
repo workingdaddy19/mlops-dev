@@ -1,11 +1,9 @@
 {% extends "base.html" %}
 
-{% block title %}게시판 - MLFoundry{% endblock %}
+{% block title %}공지사항 - AI 데이터 분석{% endblock %}
 
 {% block breadcrumb %}
-  <span>게시판</span>
-  <span class="sep">›</span>
-  <span class="current">공지사항/자료실</span>
+  <span class="current">공지사항</span>
 {% endblock %}
 
 {% block content %}
@@ -28,6 +26,12 @@
     </div>
   </div>
 
+  <div class="filter-bar">
+    <div class="fb-field"><label>시작일</label><input id="q-from" type="date" class="form-input"></div>
+    <div class="fb-field"><label>종료일</label><input id="q-to" type="date" class="form-input"></div>
+    <button class="btn btn-primary" style="padding:5px 14px; font-size:13px;" onclick="loadPosts()">🔍 조회</button>
+  </div>
+
   <table class="data-table">
     <thead>
       <tr>
@@ -44,6 +48,7 @@
       </tr>
     </tbody>
   </table>
+  <div class="list-pager" id="post-pager"></div>
 </div>
 {% endblock %}
 
@@ -52,35 +57,42 @@
 document.addEventListener('DOMContentLoaded', () => {
   const u = Auth.getUser();
   if (u && u.role === 'admin') document.getElementById('write-toggle').style.display = '';  // 작성은 관리자만
+  fillDefaultRange('q-from', 'q-to');
   loadPosts();
 });
+
+const postPager = makePager(10, renderPostRows, 'post-pager');
 
 async function loadPosts() {
   const listEl = document.getElementById('post-list');
   try {
-    const res = await apiFetch('/api/board?size=20');
+    const params = new URLSearchParams({ size: '200' });
+    dateRangeParams('q-from', 'q-to', params);
+    const res = await apiFetch('/api/board?' + params.toString());
     if (!res) return;
     const data = await res.json();
-    const posts = data.items || [];
-
-    if (posts.length === 0) {
-      listEl.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 40px; color: var(--text-muted);">게시글이 없습니다.</td></tr>';
-      return;
-    }
-
-    listEl.innerHTML = posts.map(post => `
-      <tr>
-        <td>${post.id}</td>
-        <td style="font-weight: 500;">${post.title}</td>
-        <td>${post.author || '익명'}</td>
-        <td style="font-size: 12px; color: var(--text-muted);">${new Date(post.created_at).toLocaleDateString()}</td>
-        <td style="color: var(--text-muted);">${post.view_count || 0}</td>
-      </tr>
-    `).join('');
+    postPager.set(data.items || []);
   } catch (err) {
     console.error(err);
     listEl.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 40px; color: #ef4444;">데이터를 불러오는 데 실패했습니다.</td></tr>';
   }
+}
+
+function renderPostRows(posts) {
+  const listEl = document.getElementById('post-list');
+  if (!posts.length) {
+    listEl.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 40px; color: var(--text-muted);">게시글이 없습니다.</td></tr>';
+    return;
+  }
+  listEl.innerHTML = posts.map(post => `
+    <tr>
+      <td>${post.id}</td>
+      <td style="font-weight: 500;">${post.title}</td>
+      <td>${post.author || '익명'}</td>
+      <td style="font-size: 12px; color: var(--text-muted);">${new Date(post.created_at).toLocaleDateString()}</td>
+      <td style="color: var(--text-muted);">${post.view_count || 0}</td>
+    </tr>
+  `).join('');
 }
 
 function toggleWriteForm() {

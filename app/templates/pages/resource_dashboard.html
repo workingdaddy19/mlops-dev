@@ -25,20 +25,23 @@
   <div style="overflow-x:auto;"><table class="data-table"><thead>
     <tr><th style="width:150px;">과제</th><th>신청자</th><th style="width:160px;">요청 프로파일/사양</th><th>사유</th><th style="width:160px;">처리</th></tr>
   </thead><tbody id="req-tbody"><tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:16px;">로딩 중...</td></tr></tbody></table></div>
+  <div class="list-pager" id="req-pager"></div>
 </div>
 
 <div class="card" style="margin-bottom:16px;">
   <div class="card-title" style="font-size:15px;">⏰ 만료 경과 (즉시 회수 검토)</div>
   <div style="overflow-x:auto;"><table class="data-table"><thead>
-    <tr><th>네임스페이스/노드</th><th style="width:140px;">용량</th><th style="width:110px;">ITSM</th><th style="width:180px;">만료</th></tr>
+    <tr><th>과제명</th><th style="width:110px;">신청자</th><th style="width:150px;">용량</th><th style="width:180px;">만료</th></tr>
   </thead><tbody id="over-tbody"><tr><td colspan="4" style="text-align:center;color:var(--text-muted);padding:16px;">로딩 중...</td></tr></tbody></table></div>
+  <div class="list-pager" id="over-pager"></div>
 </div>
 
 <div class="card">
   <div class="card-title" style="font-size:15px;">🟠 만료 임박 (D-14 이내)</div>
   <div style="overflow-x:auto;"><table class="data-table"><thead>
-    <tr><th>네임스페이스/노드</th><th style="width:140px;">용량</th><th style="width:110px;">ITSM</th><th style="width:180px;">만료</th></tr>
+    <tr><th>과제명</th><th style="width:110px;">신청자</th><th style="width:150px;">용량</th><th style="width:180px;">만료</th></tr>
   </thead><tbody id="soon-tbody"><tr><td colspan="4" style="text-align:center;color:var(--text-muted);padding:16px;">로딩 중...</td></tr></tbody></table></div>
+  <div class="list-pager" id="soon-pager"></div>
 </div>
 
 <!-- 승인 확정 모달 -->
@@ -73,6 +76,9 @@
 {% block scripts %}
 <script>
 let REQ_MAP = {};
+const overPager = makePager(5, (s) => renderRows('over-tbody', s, true), 'over-pager');
+const soonPager = makePager(5, (s) => renderRows('soon-tbody', s, false), 'soon-pager');
+const reqPager = makePager(5, renderReqRows, 'req-pager');
 
 document.addEventListener('DOMContentLoaded', () => { load(); loadRequests(); });
 
@@ -87,8 +93,8 @@ async function load() {
   const t = d.capacity_totals || {};
   document.getElementById('c-cap').textContent = `${t.vcpu||0} vCPU / ${t.mem_gb||0} GB${t.gpu?` / GPU ${t.gpu}`:''}`;
 
-  renderRows('over-tbody', d.overdue || [], true);
-  renderRows('soon-tbody', d.expiring || [], false);
+  overPager.set(d.overdue || []);
+  soonPager.set(d.expiring || []);
 }
 
 // ── 자원 신청 승인 대기 ────────────────────────────────────────────────────
@@ -101,11 +107,16 @@ async function loadRequests() {
   REQ_MAP = {};
   list.forEach(r => REQ_MAP[r.id] = r);
   document.getElementById('req-count').textContent = list.length;
+  reqPager.set(list);
+}
+
+function renderReqRows(list) {
+  const tbody = document.getElementById('req-tbody');
   if (!list.length) { tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:16px;">대기 중인 신청이 없습니다.</td></tr>`; return; }
   tbody.innerHTML = list.map(r => {
     const spec = `${escapeHtml(r.jupyter_server_type||'기본')} · ${fmtNum(r.alloc_vcpu)}vCPU/${fmtNum(r.alloc_mem_gb)}GB${r.alloc_gpu?`/GPU${r.alloc_gpu}`:''}`;
     return `<tr>
-      <td style="font-size:12px;"><a href="/resource/projects/${''}" onclick="return false;" style="font-weight:600;">${escapeHtml(r.project_name||'-')}</a><br><span style="color:var(--text-muted);font-family:monospace;">${escapeHtml(r.project_code||'')}</span></td>
+      <td style="font-size:12px;"><a href="/resource/projects/${r.project_id}" style="font-weight:600;">${escapeHtml(r.project_name||'-')}</a><br><span style="color:var(--text-muted);font-family:monospace;">${escapeHtml(r.project_code||'')}</span></td>
       <td style="font-size:12px;">${escapeHtml(r.requester||'-')}</td>
       <td style="font-size:12px;">${spec}</td>
       <td style="font-size:12px;color:var(--text-secondary);">${escapeHtml(r.request_note||'-')}</td>
@@ -191,9 +202,9 @@ function renderRows(tbodyId, list, overdue) {
     const exp = overdue ? `${l.expires_at} <span style="color:#dc2626;font-weight:600;">(${Math.abs(d)}일 경과)</span>`
                         : `${l.expires_at} <span style="color:#d97706;font-weight:600;">(D-${d})</span>`;
     return `<tr>
-      <td style="font-size:12px;">${escapeHtml(l.namespace||'-')}<br><span style="color:var(--text-muted);">${escapeHtml(l.node_group||'')} ${escapeHtml(l.jupyter_server_type||'')}</span></td>
+      <td style="font-size:12px;"><a href="/resource/projects/${l.project_id}" style="font-weight:600;">${escapeHtml(l.project_name||('과제 #'+l.project_id))}</a></td>
+      <td style="font-size:12px;">${escapeHtml(l.requester||'-')}</td>
       <td style="font-size:12px;">${cap}</td>
-      <td style="font-size:12px;">${escapeHtml(l.itsm_ticket||'-')}</td>
       <td style="font-size:12px;">${exp}</td>
     </tr>`;
   }).join('');

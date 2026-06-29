@@ -82,12 +82,18 @@ def count_users(
 
 @router.get("/users")
 def list_users(
+    username: str | None = None,
+    name: str | None = None,
+    date_from: str | None = None,
+    date_to: str | None = None,
     db: Session = Depends(get_db),
     _admin: UserRead = Depends(require_admin),
 ):
-    """사용자 목록 조회 (admin only)."""
+    """사용자 목록 조회 (admin only). 사번(username)·성명(name)·기간(created_at) 필터."""
+    from app.core.dateutil import parse_date
     repo = UserRepository(db)
-    return [UserAdminRead.from_orm_user(u) for u in repo.list_all()]
+    users = repo.list_all(username or None, name or None, parse_date(date_from), parse_date(date_to))
+    return [UserAdminRead.from_orm_user(u) for u in users]
 
 
 @router.post("/users", status_code=status.HTTP_201_CREATED)

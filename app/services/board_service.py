@@ -11,9 +11,10 @@ class BoardService:
     def __init__(self, repo: BoardRepository):
         self.repo = repo
 
-    def list_boards(self, board_type: str, page: int = 1, size: int = 20) -> tuple[list[BoardListItem], int]:
+    def list_boards(self, board_type: str, page: int = 1, size: int = 20,
+                    dt_from=None, dt_to=None) -> tuple[list[BoardListItem], int]:
         offset = (page - 1) * size
-        items, total = self.repo.list_by_type(board_type, offset, size)
+        items, total = self.repo.list_by_type(board_type, offset, size, dt_from, dt_to)
         return [BoardListItem.model_validate(b) for b in items], total
 
     def get_board(self, board_id: int) -> BoardRead:

@@ -118,6 +118,19 @@
   </p>
 </div>
 
+<!-- ═══ ITSM 권한 신청 작성 예시 (사용자용) ══════════════════════ -->
+<div class="card" id="itsm-example-card" style="margin-top:8px; cursor:pointer;" onclick="copyItsmExample()">
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+    <div class="card-title" style="margin:0;">📋 ITSM 권한 신청 작성 예시</div>
+    <span style="font-size:12px; color:var(--primary); font-weight:600;">클릭하여 복사 📋</span>
+  </div>
+  <pre id="itsm-text" style="margin:0; font-size:13px; line-height:1.7; background:var(--bg-sidebar); border:1px solid var(--border); border-radius:6px; padding:12px 14px; white-space:pre-wrap; color:var(--text-primary);">1) 사유 : XXXX 분석과제 진행
+2) 권한 신청 : 저장소 (S3), 데이터조회(Athena), 분석기(Jupyter)
+3) 기간 : 2026.06.27~2026.09.30 (3개월 3일)
+4) 기타 : 자원 필요사항 엔지니어 협의 후 인프라팀 전달 예정</pre>
+  <div id="itsm-toast" style="display:none; margin-top:8px; font-size:12px; color:#065f46; background:#d1fae5; border-radius:6px; padding:6px 12px; text-align:center;">✅ 클립보드에 복사되었습니다!</div>
+</div>
+
 <!-- ═══ 하단: 운영 관리 (admin only) ══════════════════════════════ -->
 <div class="card" id="ops-card" style="margin-top:16px; display:none;">
   <div class="card-title">⚙️ 운영 관리</div>
@@ -195,6 +208,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('card-resource').style.display = '';
     document.getElementById('resource-card').style.display = '';  // 분석 자원 현황
     document.getElementById('flow-card').style.display = 'none';   // 흐름 가이드는 사용자용
+    document.getElementById('itsm-example-card').style.display = 'none';  // ITSM 예시는 사용자용
   }
   Promise.allSettled([
     loadNotices(),
@@ -236,7 +250,7 @@ async function loadResourceSummary() {
 async function loadNotices() {
   const ul = document.getElementById('notice-list');
   try {
-    const res = await apiFetch('/api/board?board_type=notice&page=1&size=4');
+    const res = await apiFetch('/api/board?board_type=notice&page=1&size=2');
     if (!res || !res.ok) throw new Error();
     const data = await res.json();
     const items = data.items || [];
@@ -304,5 +318,28 @@ function setBadge(id, ok) {
 }
 function escapeHtml(s){ if(s==null)return''; return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function escapeAttr(s){ if(s==null)return''; return String(s).replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+
+function copyItsmExample() {
+  const text = document.getElementById('itsm-text').textContent;
+  const toast = document.getElementById('itsm-toast');
+  function showCopied() {
+    toast.style.display = 'block';
+    setTimeout(() => { toast.style.display = 'none'; }, 2500);
+  }
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(showCopied).catch(() => {
+      fallbackCopy(text); showCopied();
+    });
+  } else {
+    fallbackCopy(text); showCopied();
+  }
+}
+function fallbackCopy(text) {
+  const ta = document.createElement('textarea');
+  ta.value = text; ta.style.cssText = 'position:fixed;left:-9999px;';
+  document.body.appendChild(ta); ta.select();
+  try { document.execCommand('copy'); } catch {};
+  ta.remove();
+}
 </script>
 {% endblock %}

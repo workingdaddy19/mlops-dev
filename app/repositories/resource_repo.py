@@ -1,3 +1,5 @@
+from datetime import date, timedelta
+
 from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session, selectinload
 
@@ -13,24 +15,34 @@ class ResourceRepository:
         self.session = session
 
     # ── Project ─────────────────────────────────────────────────────────────
-    def list_projects(self, status: str | None = None) -> list[AnalysisProject]:
+    def list_projects(self, status: str | None = None, name: str | None = None, owner: str | None = None,
+                      dt_from: date | None = None, dt_to: date | None = None) -> list[AnalysisProject]:
         q = self.session.query(AnalysisProject)
         if status:
             q = q.filter(AnalysisProject.status == status)
+        if name:
+            q = q.filter(AnalysisProject.name.ilike(f"%{name}%"))
+        if owner:
+            q = q.filter(AnalysisProject.owner.ilike(f"%{owner}%"))
+        if dt_from:
+            q = q.filter(AnalysisProject.created_at >= dt_from)
+        if dt_to:
+            q = q.filter(AnalysisProject.created_at < dt_to + timedelta(days=1))
         return q.order_by(AnalysisProject.id.desc()).all()
 
-    def list_projects_for_user(self, username: str, name: str | None = None) -> list[AnalysisProject]:
+    def list_projects_for_user(self, username: str, name: str | None = None,
+                               dt_from: date | None = None, dt_to: date | None = None) -> list[AnalysisProject]:
         """본인 과제 — owner/created_by 정확매칭 + members 텍스트 LIKE(MVP)."""
         conds = [AnalysisProject.owner == username, AnalysisProject.created_by == username]
         if name:
             conds.append(AnalysisProject.owner == name)
             conds.append(and_(AnalysisProject.members.isnot(None), AnalysisProject.members.ilike(f"%{name}%")))
-        return (
-            self.session.query(AnalysisProject)
-            .filter(or_(*conds))
-            .order_by(AnalysisProject.id.desc())
-            .all()
-        )
+        q = self.session.query(AnalysisProject).filter(or_(*conds))
+        if dt_from:
+            q = q.filter(AnalysisProject.created_at >= dt_from)
+        if dt_to:
+            q = q.filter(AnalysisProject.created_at < dt_to + timedelta(days=1))
+        return q.order_by(AnalysisProject.id.desc()).all()
 
     def get_project(self, project_id: int) -> AnalysisProject | None:
         return (
@@ -90,6 +102,7 @@ class ResourceRepository:
     def list_ledgers_by_statuses(self, statuses: tuple[str, ...]) -> list[ResourceLedger]:
         return (
             self.session.query(ResourceLedger)
+            .options(selectinload(ResourceLedger.project))
             .filter(ResourceLedger.status.in_(statuses))
             .order_by(ResourceLedger.expires_at.is_(None), ResourceLedger.expires_at.asc())
             .all()

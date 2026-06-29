@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from sqlalchemy.orm import Session
 from app.api.deps import get_current_user, get_db, get_query_service, require_admin
+from app.core.dateutil import parse_date
 from app.models.query_history import DataQueryHistory
 from app.repositories.query_history_repo import QueryHistoryRepository
 from app.schemas.auth import UserRead
@@ -17,20 +18,24 @@ logger = logging.getLogger(__name__)
 
 @router.get("/history", response_model=list[QueryHistoryRead])
 def get_history(
+    date_from: str | None = None,
+    date_to: str | None = None,
     user: UserRead = Depends(get_current_user),
     service: QueryService = Depends(get_query_service),
 ):
-    """현재 로그인 유저 본인의 쿼리 실행 기록."""
-    return service.get_history(user.username)
+    """현재 로그인 유저 본인의 쿼리 실행 기록. 실행일자 기간 필터."""
+    return service.get_history(user.username, parse_date(date_from), parse_date(date_to))
 
 
 @router.get("/history/all", response_model=list[QueryHistoryRead])
 def get_all_history(
+    date_from: str | None = None,
+    date_to: str | None = None,
     _admin: UserRead = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
-    """전체 사용자의 쿼리 실행 기록 (사용자 ID 포함) — admin only."""
-    items = QueryHistoryRepository(db).list_all()
+    """전체 사용자의 쿼리 실행 기록 (사용자 ID 포함) — admin only. 실행일자 기간 필터."""
+    items = QueryHistoryRepository(db).list_all(parse_date(date_from), parse_date(date_to))
     return [QueryHistoryRead.model_validate(h) for h in items]
 
 

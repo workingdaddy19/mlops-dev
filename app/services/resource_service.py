@@ -118,12 +118,20 @@ class ResourceService:
         read.expiry_state = state
         return read
 
+    # ── 공통: ledger → 과제명·신청자 포함 dict ───────────────────────────────
+    def _ledger_row(self, l: ResourceLedger) -> dict:
+        d = self.to_ledger_read(l).model_dump(mode="json")
+        d["project_name"] = l.project.name if l.project else None
+        d["project_code"] = l.project.code if l.project else None
+        d["requester"] = l.recorded_by   # 신청자 = 요청 작성자
+        return d
+
     # ── 대시보드 ─────────────────────────────────────────────────────────────
     def dashboard(self) -> dict:
         active = self.repo.list_ledgers_by_statuses(("active",))
-        rows = [self.to_ledger_read(l) for l in active]
-        expiring = [r for r in rows if r.expiry_state == "soon"]
-        overdue = [r for r in rows if r.expiry_state == "overdue"]
+        rows = [self._ledger_row(l) for l in active]
+        expiring = [r for r in rows if r["expiry_state"] == "soon"]
+        overdue = [r for r in rows if r["expiry_state"] == "overdue"]
 
         totals = {
             "vcpu": round(sum((l.alloc_vcpu or 0) for l in active), 2),
@@ -135,22 +143,65 @@ class ResourceService:
             "expiring_count": len(expiring),
             "overdue_count": len(overdue),
             "capacity_totals": totals,
-            "active": [r.model_dump(mode="json") for r in rows],
-            "expiring": [r.model_dump(mode="json") for r in expiring],
-            "overdue": [r.model_dump(mode="json") for r in overdue],
+            "active": rows,
+            "expiring": expiring,
+            "overdue": overdue,
         }
 
-    def reclaim_view(self) -> dict:
+    def reclaim_view(self, dt_from=None, dt_to=None, name=None, requester=None) -> dict:
         pending = self.repo.list_ledgers_by_statuses(("reclaim_pending",))
         reclaimed = self.repo.list_ledgers_by_statuses(("reclaimed",))
+        if dt_from or dt_to:
+            reclaimed = [l for l in reclaimed if l.reclaimed_at
+                         and (not dt_from or l.reclaimed_at >= dt_from)
+                         and (not dt_to or l.reclaimed_at <= dt_to)]
+
+        def keep(l):
+            if name and not (l.project and name.lower() in (l.project.name or "").lower()):
+                return False
+            if requester and requester.lower() not in (l.recorded_by or "").lower():
+                return False
+            return True
+        pending = [l for l in pending if keep(l)]
+        reclaimed = [l for l in reclaimed if keep(l)]
         return {
-            "pending": [self.to_ledger_read(l).model_dump(mode="json") for l in pending],
-            "reclaimed": [self.to_ledger_read(l).model_dump(mode="json") for l in reclaimed],
+            "pending": [self._ledger_row(l) for l in pending],
+            "reclaimed": [self._ledger_row(l) for l in reclaimed],
         }
 
     # ── 사용자 스코프 ────────────────────────────────────────────────────────
-    def list_my_projects(self, user: UserRead) -> list[AnalysisProject]:
-        return self.repo.list_projects_for_user(user.username, (user.name or "").strip() or None)
+    def list_my_projects(self, user: UserRead, dt_from=None, dt_to=None) -> list[AnalysisProject]:
+        return self.repo.list_projects_for_user(
+            user.username, (user.name or "").strip() or None, dt_from, dt_to)
+
+    # ── FR-6 산정서 잔여 한도 ───────────────────────────────────────────────
+    def remaining_capacity(self, project_id: int) -> dict:
+        """승인된 산정서 Peak − (approved+active 배분 합계) = 남은 한도."""
+        proj = self.repo.get_project(project_id)
+        approved = next((e for e in (proj.estimates if proj else []) if e.status == "approved"), None)
+        if not approved:
+            return {"has_approved_estimate": False, "peak_vcpu": 0, "peak_mem": 0,
+                    "used_vcpu": 0, "used_mem": 0, "remain_vcpu": 0, "remain_mem": 0}
+        peak_v = approved.derived_peak_vcpu or 0
+        peak_m = approved.derived_peak_memory_gb or 0
+        used_v = sum((l.alloc_vcpu or 0) for l in proj.ledgers if l.status in ("approved", "active"))
+        used_m = sum((l.alloc_mem_gb or 0) for l in proj.ledgers if l.status in ("approved", "active"))
+        return {
+            "has_approved_estimate": True,
+            "peak_vcpu": peak_v, "peak_mem": peak_m,
+            "used_vcpu": round(used_v, 2), "used_mem": round(used_m, 2),
+            "remain_vcpu": round(peak_v - used_v, 2), "remain_mem": round(peak_m - used_m, 2),
+        }
+
+    def assert_request_capacity(self, project_id: int, vcpu, mem) -> None:
+        """신청/등록 시점 한도 검증 — 승인 산정서 필수 + 단건이 남은 한도 이내."""
+        cap = self.remaining_capacity(project_id)
+        if not cap["has_approved_estimate"]:
+            raise ValueError("승인된 용량 산정서가 없습니다. 산정서 작성·승인 후 신청하세요.")
+        if vcpu is not None and cap["peak_vcpu"] and vcpu > cap["remain_vcpu"] + 1e-9:
+            raise ValueError(f"vCPU 한도 초과 — 남은 {cap['remain_vcpu']} vCPU (요청 {vcpu})")
+        if mem is not None and cap["peak_mem"] and mem > cap["remain_mem"] + 1e-9:
+            raise ValueError(f"메모리 한도 초과 — 남은 {cap['remain_mem']} GB (요청 {mem})")
 
     def my_allocations(self, user: UserRead) -> dict:
         """본인(assigned_to)에게 부여된 active 할당 + 시작일 접근게이팅 + 합계 + 프로파일."""
@@ -235,13 +286,18 @@ class ResourceService:
         if peak_m and (used_m + (ledger.alloc_mem_gb or 0)) > peak_m + 1e-9:
             raise ValueError(f"메모리 배분 합계 {round(used_m + ledger.alloc_mem_gb, 2)}GB가 산정서 한도 {peak_m}GB를 초과합니다.")
 
-    def my_ledgers(self, user: UserRead) -> list[dict]:
+    def my_ledgers(self, user: UserRead, dt_from=None, dt_to=None) -> list[dict]:
         """본인 과제들의 전체 자원 대장(라이프사이클) + 과제명/만료/접근상태."""
         projects = self.list_my_projects(user)
         pmap = {p.id: p for p in projects}
         today = date.today()
         out: list[dict] = []
         for l in self.repo.list_ledgers_for_projects(list(pmap.keys())):
+            cd = l.created_at.date() if l.created_at else None
+            if dt_from and (cd is None or cd < dt_from):
+                continue
+            if dt_to and (cd is None or cd > dt_to):
+                continue
             proj = pmap.get(l.project_id)
             read = self.to_ledger_read(l).model_dump(mode="json")
             read["project_code"] = proj.code if proj else None
