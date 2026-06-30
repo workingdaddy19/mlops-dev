@@ -22,6 +22,13 @@ def ensure_default_settings(engine: Engine) -> None:
             if existing is None:
                 session.add(SystemSetting(**item))
                 logger.info("settings seed: inserted key=%s", item["key"])
+        # JUPYTER_ENVS: 구포맷(용량 타입 size 키 없음) → 신포맷(small/medium/large) 1회 마이그레이션
+        envs_row = session.get(SystemSetting, "JUPYTER_ENVS")
+        if envs_row and envs_row.value and '"size"' not in envs_row.value:
+            new_val = next((s["value"] for s in SETTINGS_SEED if s["key"] == "JUPYTER_ENVS"), None)
+            if new_val:
+                envs_row.value = new_val
+                logger.info("settings migrate: JUPYTER_ENVS → 용량 타입(size) 포맷으로 갱신")
         for key in _OBSOLETE_KEYS:
             row = session.get(SystemSetting, key)
             if row is not None:
