@@ -119,10 +119,12 @@ class JupyterService:
         else:
             try:
                 sso_jwt = jwt.encode(payload, self.jwt_secret, algorithm="HS256")
-                # jwtauthenticator는 next URL 안의 token 파라미터를 검증함
-                # /hub/login?next=/user/{username}/lab?token={jwt} 구조가 정상 동작
-                next_with_token = quote(f"{lab_path}?token={sso_jwt}", safe="")
-                lab_url = f"{self.base_url}/hub/login?next={next_with_token}"
+                # 토큰은 /hub/login의 **최상위 query param(token=)** 으로 전달해야
+                # JupyterHub jwtauthenticator가 handler.get_argument("token")로 읽는다.
+                # (기존: next 안에 token을 중첩 → JupyterHub가 못 읽어 401 발생)
+                #   올바른 형식: /hub/login?token=<JWT>&next=<로그인 후 이동 경로>
+                next_target = quote(lab_path, safe="")   # 인증 후 이동: 사용자 lab
+                lab_url = f"{self.base_url}/hub/login?token={sso_jwt}&next={next_target}"
             except Exception as e:
                 logger.error("Failed to generate JWT: %s", e)
                 lab_url = f"{self.base_url}{lab_path}"
